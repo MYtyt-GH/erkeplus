@@ -248,14 +248,19 @@ POST /activity/enroll/cancel/person { id, applyInfo }               // 取消报
 | --- | --- | --- |
 | `GET banners` | `{"type":1}` | `data: [{jumpType, path, params, url}]` |
 
-- **`url` 是图片地址，不是跳转链接**。官方拿它再生成 275×100 的缩略图，点的是整张图
+- 是**数组**，可以有多条（首页是 5 秒一张的轮播）。2026-10-29 抓到的样本只有 1 条，
+  而且恰好是一条「只有图、没跳转」的配置（`path` 为空、`params` 为 `{"id":}`）。
+  横幅内容历来会换，所以下面除字段含义外，跳转规则只来自源码，没有实测样本
+- `url` 是**图片地址**，不是跳转链接。官方用 `getAliyunImageUrl(url, 275, 100)` 生成缩略图
+- 返回空数组时官方塞一张内置默认图，不需要额外接口
 - `params` 是**字符串化的 JSON**，形如 `{"id":123}`。官方没解析它，而是
-  `substring(6, length-1)` 硬切出 id —— 格式一变就崩。客户端应当 `JSON.parse` 后取 `id`
-- `jumpType`：`1` 时目标就是那个 id；`2` 时目标是 `#/<path 第一段>/<id>`。
-  实测这条 banner 的 `path` 为空、`params` 里的 id 也是空（`{"id":}`），属于「只有图、点了没反应」
-  的配置，所以这两种分支只从源码读出，**没有真的跳到目标页验证过**
+  `substring(6, length-1)` 硬切出 id —— 格式一变就崩。客户端应 `JSON.parse` 后取 `id`
+- `jumpType` 决定跳转目标（源码 `getBanner`）：`1` → 目标是那个 id；`2` →
+  `#/<path 第一段>/<id>`（`path` 取 `/` 之前那一段）
+- **但这一版首页模板没把跳转地址绑到点击上**：横幅只响应长按 800ms「保存图片」
+  （`startPress` → `saveImage`），算出来的 `url` 没被使用。也就是说现在点横幅不会跳转；
+  客户端要做跳转得自己按上面的规则拼，并先用一条真实 banner 验证过再上线
 - `title` 官方写死空串，banner 上不显示文字
-- 没有 banner 时官方塞一张内置默认图，不需要额外接口
 
 ### 公告条 `announcement/list/noPage`
 
@@ -263,8 +268,8 @@ POST /activity/enroll/cancel/person { id, applyInfo }               // 取消报
 | --- | --- | --- |
 | `GET announcement/list/noPage` | `{"noticeType":1}` | `data: [...]` |
 
-- 首页是竖向滚动的公告条，每条只渲染 `title`；点击进公告详情（官方方法名 `gonoticeShow`，
-  路由与详情接口**未验证**）
+- 首页是竖向滚动的公告条（3 秒一条），每条只渲染 `title`；点击 `$router.push({name:"noticeInfor"})`，
+  即 `#/noticeInfor`，**不带参数**。那个页面的接口还没抓过
 - 实测当前返回**空数组**，官方原文显示「暂无公告」。所以非空时的完整字段还没见过——
   接入时按「只读 `title`、能容忍空」处理，等真出现一条公告再补字段
 - 这跟「活动公告」不是一回事：活动公告走 `activity/noticeList`，见下一节
