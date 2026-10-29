@@ -413,6 +413,55 @@ score = hours × 0.025        // 我校 40 学时 = 1 学分
 ]},"msg":"ok"}
 ```
 
+### 成绩单页（`#/scoreReport`，2026-10-29 实测）
+
+成绩单页自己的数据源，**不带参数**：
+
+| 端点 | 参数 | 返回 |
+| --- | --- | --- |
+| `GET student/achievement/detail-app` | 无 | `data.user{...}` + `data.tags[]{...}` |
+
+`data.user` 与 `my-info` 同一套口径，`hours` / `score` 都是 double：
+
+| 字段 | 含义 | 实测值 / 备注 |
+| --- | --- | --- |
+| `hours` | 已获学时 | `3.0` |
+| `score` | 已获学分 | `0.075`，正好 `hours × 0.025`，与排行榜同一个数 |
+| `code` | 学号 | 隐私字段，文档不记值 |
+| `name` | 姓名 | 同上 |
+| `className` / `classId` | 班级 | `信计26-3` / `94851` |
+| `majorName` / `majorId` / `majorLength` | 专业、专业 id、学制 | `majorLength` 是字符串 `"4"` |
+| `collegeName` / `collegeId` | 学院 | `数学与大数据学院` / `6147` |
+| `grade` | 年级 | 数字 `2026` |
+| `gender` | 性别 | 1 男 2 女 |
+| `politics` | 政治面貌编号 | `0` |
+| `status` | 学籍状态 | `1` |
+| `schoolName` / `origLogo` | 学校名 / 校徽 | |
+| `cardPhoto` | 证件照 URL | |
+| `showSealName1` / `showSealName2` | 印章，格式 `文案&&图片URL` | 2 实测为 `校团委&&…aust_seal.png` |
+
+`data.tags` 是**按分类的学时进度**，实测 6 条：
+
+| 字段 | 含义 |
+| --- | --- |
+| `name` | 分类名（服务端下发） |
+| `minHours` | 该分类要求学时，实测为 `40 / 5 / 20 / 5 / 40 / 0` |
+| `userValue` | 该分类已获学时 |
+| `showUserValue` | 展示用学时，实测与 `userValue` 相同 |
+
+同一页还会打三个配置类接口，都不是新数据，是页面初始化：
+
+- `GET decimal` —— 小数位展示配置
+- `GET ways-convert` —— 学时折算学分规则（`waysConvert=1`，见上一节）
+- `GET dict/school/system-para/list?params=…` —— 学时单位。`params` 是**两次 URL 编码**的
+  `{"fieldType":"school","keyWord":"score_unit"}`：域名串里看到的是 `%257B%2522fieldType…`，
+  解码一次仍是 `%7B…%7D`，客户端按官方写法编码两次即可
+
+两个注意点：
+
+- 响应里带 `token` 字段，客户端**不要读、不要存**；鉴权头本来就是请求自带的
+- `code`（学号）与 `name`（姓名）是真实个人信息，文档与日志都不记录
+
 ## 组织（2026-10-24 实测）
 
 官方有三处入口都指向同一套接口：`#/myOrganization`（我的组织）、`#/service/organize`
