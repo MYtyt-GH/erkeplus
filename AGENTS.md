@@ -133,13 +133,24 @@ Edge 的调试端点写在 `%LOCALAPPDATA%\Microsoft\Edge\User Data\DevToolsActi
 3. 之后命令都带 `sessionId`：`Runtime.evaluate` 取数据；
    `Network.enable` + 监听 `Network.responseReceived` + `Network.getResponseBody` 抓响应体
 
-可复用脚本在 `tem/cdp.ps1`（不入库）：
+**Edge 每新建一条 WebSocket 都会弹「是否允许远程调试」，同一条连接不会重复弹。**
+所以别每条命令都新连一次：起一个常驻中转（`tem/cdpserver.ps1`，后台跑），
+后续命令走本机 TCP（`tem/cdpq.ps1`）复用它那条连接；只有中转挂了才需要重连、再点一次「允许」。
 
 ```powershell
-cd tem
-powershell -NoProfile -ExecutionPolicy Bypass -File .\cdp.ps1 -Targets
-powershell -NoProfile -ExecutionPolicy Bypass -File .\cdp.ps1 -Expr "location.href"
+# 起一次（后台运行），Edge 弹窗点「允许」
+powershell -NoProfile -ExecutionPolicy Bypass -File tem\cdpserver.ps1
+
+# 之后都用这个，不再弹授权
+powershell -NoProfile -ExecutionPolicy Bypass -File tem\cdpq.ps1 -Op targets
+powershell -NoProfile -ExecutionPolicy Bypass -File tem\cdpq.ps1 -Op eval -Expr "location.href"
+powershell -NoProfile -ExecutionPolicy Bypass -File tem\cdpq.ps1 -Op trace -Reload -Hash '#/honestValue' -Seconds 12 -WithBody -Only credit -Redact
 ```
+
+`trace` 的 `-Only` 只取 URL 含该子串的响应体，`-Redact` 把 name/code/token 等字段值打码。
+单次用的 `cdp.ps1` / `capture.ps1` 还留着，但它们每跑一次就是一条新连接，会再弹一次授权。
+
+**已经抓过的接口不要重复请求**：同一份数据一次拿到就够，失败了才重试。
 
 要抓 `https://win.9xueqi.com` 的接口，前提是**用户已经在该 Edge 里登录**：登录只能由用户自己做，
 不要代填账号密码，也不要把 token 打进任何输出。
