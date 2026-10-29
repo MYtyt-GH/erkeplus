@@ -323,6 +323,52 @@ adb shell am start -n gitee.leolin_me.erkepp.debug/gitee.leolin_me.erkepp.MainAc
   已守约 / 已失约多出 `amount`、`operator`（`+`/`-`）、`attendanceType`、`ctime`、`comment`。
   实测已守约的 `amount` 是 0，失约是扣分（1.67）。
 - 页面上的「信用优异」= `credit` 落在哪个分数段，不是单独字段。
+- 分数段条目还带 `id` 与 `minViolateNumber` / `maxViolateNumber`：按**违约次数**分档，
+  实测 0（完美）、1–3、4–6、7–9、10–12、13 以上（`maxViolateNumber` 为 `null`=无上限）。
+  客户端画进度条只需要 `minScore` / `maxScore` / `grade`，这两个次数字段暂时没用
+
+### 移除黑名单（申请与查看，2026-10-29 实测）
+
+被拉黑后 `credit/user/detail` 的 `blacklist` 不再是 `null`，实测结构：
+
+```json
+{"faithUpdateTime":1792916347000,
+ "blacklist":{"id":274560,"applyId":173353,
+              "generateReason":"因你2次未完成活动,已被系统拉入黑名单,在2026-11-01 16:19:07之前不能参加活动!"},
+ "credit":97.78}
+```
+
+- `blacklist.id` 是黑名单记录 id（提交申请时作 `blacklistId`）
+- `blacklist.applyId` 是**当前这一次**移出申请的 id，`relieve/detail` 就用它查
+- `generateReason` 是一句带时间的说明，**不要自己解析这句话算到期时间**，要用就整句展示
+
+查看已有申请（官方的「查看申请」按钮）：
+
+| 端点 | 参数 | 返回 |
+| --- | --- | --- |
+| `GET credit/user/blacklist/relieve/detail` | `{applyId}` | `{ctime, applyInfo, status, auditTime, auditRemark, auditorName}` |
+
+- `applyInfo` 是用户自己填的申诉理由、`auditorName` 是审核人姓名：都属于个人信息，
+  界面上展示可以，**不要写进日志或文档**
+- `ctime` 是毫秒时间戳；未审核时 `auditTime` / `auditRemark` 为 `null`
+- `status` 实测本篇为 `1`；审核通过 / 驳回分别对应哪个值**未实测**
+
+提交移出申请（**来自 H5 源码 `/js/44.*.js` 的 `onConfirm5`，未实测**——没有真去提交一份申请）：
+
+```
+POST credit/user/blacklist/relieve/submit
+Body: {blacklistId, applyId, applyInfo, isAdd}
+```
+
+- `blacklistId` 取 `blacklist.id`，`applyId` 取 `blacklist.applyId`，`applyInfo` 是用户填的理由
+  （官方前端在理由为空时直接 toast「请填写理由哦~」，不发请求）
+- `isAdd`：官方写法 `status == 1 || status == 3 ? 2 : 1`，`status` 取 `relieve/detail` 的 `status`。
+  两个取值的语义没验证，接入时照抄这条规则，不要自行解释
+- 提交成功后官方 toast「提交成功」并重拉 `credit/user/detail`
+- **写操作，抓包时没有触发**；接入前要在测试环境实测一次请求体编码（是 JSON body 还是 `params=`）
+
+`dict/school/system-para/list?params={"fieldType":"blackList"}` 返回黑名单的两个维度，
+实测 `[{id:"day",des:"黑名单"},{id:"num",des:"黑名单"}]`，`params` 同样要编码两次。
 
 ## 个人资料字段（2026-10-23 实测）
 `GET student/user/my-info` 里有两个容易搞混的数字：
