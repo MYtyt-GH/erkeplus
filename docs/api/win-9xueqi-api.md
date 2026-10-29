@@ -237,6 +237,67 @@ POST /activity/enroll/cancel/person { id, applyInfo }               // 取消报
 - 所有时间字段都是毫秒时间戳。
 - `honestLimit` 可能为 `null`。
 
+## 首页（`#/home`，2026-10-29 实测）
+
+官方首页从上到下：横幅 → 公告条 → 顶部宫格 → 数据提醒 → 推荐活动。这一节记前三者，
+活动列表见后面的章节。
+
+### 横幅 `banners`
+
+| 端点 | 参数 | 返回 |
+| --- | --- | --- |
+| `GET banners` | `{"type":1}` | `data: [{jumpType, path, params, url}]` |
+
+- **`url` 是图片地址，不是跳转链接**。官方拿它再生成 275×100 的缩略图，点的是整张图
+- `params` 是**字符串化的 JSON**，形如 `{"id":123}`。官方没解析它，而是
+  `substring(6, length-1)` 硬切出 id —— 格式一变就崩。客户端应当 `JSON.parse` 后取 `id`
+- `jumpType`：`1` 时目标就是那个 id；`2` 时目标是 `#/<path 第一段>/<id>`。
+  实测这条 banner 的 `path` 为空、`params` 里的 id 也是空（`{"id":}`），属于「只有图、点了没反应」
+  的配置，所以这两种分支只从源码读出，**没有真的跳到目标页验证过**
+- `title` 官方写死空串，banner 上不显示文字
+- 没有 banner 时官方塞一张内置默认图，不需要额外接口
+
+### 公告条 `announcement/list/noPage`
+
+| 端点 | 参数 | 返回 |
+| --- | --- | --- |
+| `GET announcement/list/noPage` | `{"noticeType":1}` | `data: [...]` |
+
+- 首页是竖向滚动的公告条，每条只渲染 `title`；点击进公告详情（官方方法名 `gonoticeShow`，
+  路由与详情接口**未验证**）
+- 实测当前返回**空数组**，官方原文显示「暂无公告」。所以非空时的完整字段还没见过——
+  接入时按「只读 `title`、能容忍空」处理，等真出现一条公告再补字段
+- 这跟「活动公告」不是一回事：活动公告走 `activity/noticeList`，见下一节
+
+### 数据提醒（三个数字条）`user/modules`
+
+| 端点 | 参数 | 返回 |
+| --- | --- | --- |
+| `GET user/modules` | `{}` | `data.tabBar[]`、`data.schoolRestFul{}`、`data.stuData{}`、`data.mine[]` |
+
+`stuData` 就是首页那三个条，**文案、数值、图标、跳转全部由服务端下发**，客户端不要写死：
+
+| 字段 | 含义 |
+| --- | --- |
+| `serviceName` | 这一块的标题，实测「数据提醒」 |
+| `list[].stuDes` | 文案，实测「获得成绩」「完成活动数」「成功申报数」 |
+| `list[].score` | 数字，实测 3 / 3 / 0 |
+| `list[].icon` | 图标 URL |
+| `list[].orderNo` | 排序，实测 1 / 2 / 3 |
+| `list[].url` | 点击跳的路由，实测 `/scoreReportShow`、`/myAcitivty/6`、`/myProjectSuccess/` |
+
+三个入口点进去各自调什么（2026-10-29 逐条点开实测）：
+
+| 条 | 路由 | 进去后的接口 |
+| --- | --- | --- |
+| 获得成绩 | `#/scoreReportShow` | `student/achievement/by-classify-list` |
+| 完成活动数 | `#/myAcitivty/6` | `activity/my-list`（`status=12`） |
+| 成功申报数 | `#/myProjectSuccess/` | `project/request/list1`（`status=2`） |
+
+同一个接口还返回底部导航 `tabBar` 与顶部宫格 `schoolRestFul.list`：实测宫格 9 项
+（活动 / 奖项申报 / 学生组织 / 打卡 / 问卷调查 / 诚信 / 二课成绩 / 共建活动 / 更多 →
+`/service/more`）。底部「阅办」上的红点是 `message/notice/un-read-count`，跟这三个条无关。
+
 ## 活动公告（2026-10-21 实测）
 
 | 场景 | 接口 | 参数 |
