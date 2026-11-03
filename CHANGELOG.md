@@ -22,6 +22,9 @@
   人物主页那一条注明**只做完一半**）；README「未来规划」把这两件事列回待办，
   「体验优化」补一条人物主页说明；同时修掉 0.9.0 段落里两处「只登记、未实现」的旧句
   ——那里和同段的实现记录自相矛盾
+- 重构试点：把「所有组织」的可见性从散落的 `var showAllOrgs` 收进
+  [`ui/MainUiState.kt`](android/app/src/main/java/gitee/leolin_me/erkepp/ui/MainUiState.kt)，
+  约定只读 + `copy()` 修改。行为不变，其余 `showXxx` 之后一个一个迁，不一次搬完
 
 ## [0.9.0] - 2026-10-25
 

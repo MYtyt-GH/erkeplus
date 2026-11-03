@@ -78,6 +78,7 @@ import gitee.leolin_me.erkepp.data.StorageRepository
 import gitee.leolin_me.erkepp.data.WebPrefill
 import gitee.leolin_me.erkepp.ui.DisclaimerDialog
 import gitee.leolin_me.erkepp.ui.ErkeppTheme
+import gitee.leolin_me.erkepp.ui.MainUiState
 import gitee.leolin_me.erkepp.ui.SecondaryPage
 import gitee.leolin_me.erkepp.ui.WebShell
 import gitee.leolin_me.erkepp.ui.attachments.AttachmentActionsSheet
@@ -269,7 +270,8 @@ class MainActivity : ComponentActivity() {
                 var showTags by remember { mutableStateOf(false) }
                 var showStorage by remember { mutableStateOf(false) }
                 // 「更多」里的组织：所有组织目录、只认组织码的扫码页
-                var showAllOrgs by remember { mutableStateOf(false) }
+                // 试点：覆盖层可见性收进 MainUiState，其余 showXxx 后续逐个迁
+                var uiState by remember { mutableStateOf(MainUiState()) }
                 var showJoinScan by remember { mutableStateOf(false) }
                 // 「我的」里的我的组织，和它点开的详情
                 var showOrganizations by remember { mutableStateOf(false) }
@@ -655,7 +657,7 @@ class MainActivity : ComponentActivity() {
                                     .getOrElse { "ERR ${it.message}" },
                             )
                         }
-                        "all_orgs" -> showAllOrgs = true
+                        "all_orgs" -> uiState = uiState.copy(showAllOrgs = true)
                         "org_detail" -> orgDetailTarget =
                             intent.getLongExtra("org_id", 39261L) to
                                 intent.getStringExtra("org_name").orEmpty()
@@ -928,7 +930,7 @@ class MainActivity : ComponentActivity() {
                                         )
 
                                         MainTab.MORE -> MoreScreen(
-                                            onOpenAllOrganizations = { showAllOrgs = true },
+                                            onOpenAllOrganizations = { uiState = uiState.copy(showAllOrgs = true) },
                                             onJoinOrganization = { showJoinScan = true },
                                             onOpenPersonalInfo = {
                                                 showPersonalInfo = true
@@ -1146,14 +1148,14 @@ class MainActivity : ComponentActivity() {
                             // 严格按「谁压谁」排：组织列表留在最底下，返回时滚动位置和数据都还在
 
                             // 所有组织：官方 #/service/organize 的只读目录
-                            if (showAllOrgs) {
-                                SecondaryPage(onBack = { showAllOrgs = false }) {
+                            if (uiState.showAllOrgs) {
+                                SecondaryPage(onBack = { uiState = uiState.copy(showAllOrgs = false) }) {
                                     AllOrganizationsScreen(
                                         token = current.token,
                                         repository = organizationRepository,
                                         preloadEnabled = preferences.preloadEnabled,
                                         onOpenOrg = { id, name -> openOrg(id, name) },
-                                        onBack = { showAllOrgs = false },
+                                        onBack = { uiState = uiState.copy(showAllOrgs = false) },
                                     )
                                 }
                             }
