@@ -132,14 +132,6 @@ enum class MainTab(val label: String, val iconRes: Int) {
     SETTINGS("设置", R.drawable.ic_settings),
 }
 
-/**
- * 本地会话里个人资料的结构版本。
- *
- * 每次给 `my-info` 加新字段（头像、学分…）就 +1：老会话缺少这些值，进「我的」时会补拉一次，
- * 拉完写回并记下版本，之后不再重复请求。
- */
-private const val PROFILE_SCHEMA = 1
-
 class MainActivity : ComponentActivity() {
 
     private var pendingFileCallback: ValueCallback<Array<Uri>>? = null
@@ -286,6 +278,10 @@ class MainActivity : ComponentActivity() {
                 var personalInfoTick by remember { mutableIntStateOf(0) }
                 // 「我的」上的诚信值摘要：进这一页时拉一次，失败就显示「—」，不挡别的入口
                 var creditDetail by remember { mutableStateOf<CreditDetail?>(null) }
+                // 「我的」资料刷新：本次启动首次进入自动刷一次，之后只在用户主动刷新时拉
+                var profileRefreshing by remember { mutableStateOf(false) }
+                var profileAutoRefreshed by remember { mutableStateOf(false) }
+                var lastProfileTap by remember { mutableLongStateOf(0L) }
                 // 支持 `am start ... --el detail_id 566506` 直接开详情，方便调试和截图
                 var detailActivityId by remember {
                     mutableStateOf(intent.getLongExtra("detail_id", 0L).takeIf { it > 0L })
@@ -827,34 +823,32 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            // 头像 / 年级这些字段在旧会话里没有：进「我的」时补拉一次并落盘，
-                            // 之后就一直用缓存，只有点「刷新资料」才会再取
                             // 刷新会话里缓存的资料。
                             // 落盘要在 IO 线程做：写的是 SharedPreferences + AndroidKeyStore 加密，
                             // 放在主线程上会让「点开详细资料」先卡一下。
+                            //
+                            // 调用时机只有三处：本次启动首次进「我的」、下拉刷新、双击底部「我的」。
+                            // 其余任何时候都不主动拉——学分/学时变化不频繁，没必要每次进页面都请求。
                             fun reloadProfile() {
                                 val s = session ?: return
+                                if (profileRefreshing) return
+                                profileRefreshing = true
                                 scope.launch {
                                     runCatching { authRepository.fetchProfile(s.token) }
                                         .onSuccess { (profile, raw) ->
                                             val updated = s.copy(profile = profile, rawProfile = raw)
                                             session = updated
                                             withContext(Dispatchers.IO) { sessionStore.save(updated) }
-                                            preferences.profileSchema = PROFILE_SCHEMA
+                                            preferences.profileUpdatedAt = System.currentTimeMillis()
                                         }
+                                    profileRefreshing = false
                                 }
                             }
-                            LaunchedEffect(tab, preferences.profileSchema) {
-                                val s = session ?: return@LaunchedEffect
-                                // 老会话里没有头像 / 学分：补拉一次并落盘，之后走缓存
-                                if (tab == MainTab.PROFILE && preferences.profileSchema < PROFILE_SCHEMA) {
-                                    runCatching { authRepository.fetchProfile(s.token) }
-                                        .onSuccess { (profile, raw) ->
-                                            val updated = s.copy(profile = profile, rawProfile = raw)
-                                            session = updated
-                                            withContext(Dispatchers.IO) { sessionStore.save(updated) }
-                                            preferences.profileSchema = PROFILE_SCHEMA
-                                        }
+                            LaunchedEffect(tab, session?.token) {
+                                // 启动后第一次进「我的」自动拉一次；本次运行内不再自动拉
+                                if (tab == MainTab.PROFILE && session != null && !profileAutoRefreshed) {
+                                    profileAutoRefreshed = true
+                                    reloadProfile()
                                 }
                             }
 
@@ -916,11 +910,10 @@ class MainActivity : ComponentActivity() {
                                         MainTab.PROFILE -> ProfileScreen(
                                             session = current,
                                             credit = creditDetail,
-                                            onOpenPersonalInfo = {
-                                                showPersonalInfo = true
-                                                // 顺便刷新会话里的头像与学分，回来时「我的」也是新的
-                                                reloadProfile()
-                                            },
+                                            updatedAt = preferences.profileUpdatedAt,
+                                            refreshing = profileRefreshing,
+                                            onRefresh = { reloadProfile() },
+                                            onOpenPersonalInfo = { showPersonalInfo = true },
                                             onOpenCredit = { showCredit = true },
                                             onOpenRank = { showRank = true },
                                             onOpenOrganizations = { showOrganizations = true },
@@ -976,7 +969,18 @@ class MainActivity : ComponentActivity() {
                                                         }
 
                                                         MainTab.SETTINGS -> settingsSection = SettingsSection.ROOT
-                                                        MainTab.PROFILE, MainTab.MORE -> Unit
+                                                        // 双击「我的」：重新拉一次资料（学分/学时/头像）
+                                                        MainTab.PROFILE -> {
+                                                            val now = SystemClock.uptimeMillis()
+                                                            if (now - lastProfileTap <= 400L) {
+                                                                lastProfileTap = 0L
+                                                                reloadProfile()
+                                                            } else {
+                                                                lastProfileTap = now
+                                                            }
+                                                        }
+
+                                                        MainTab.MORE -> Unit
                                                     }
                                                 } else {
                                                     goTab(item)
