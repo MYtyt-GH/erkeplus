@@ -173,12 +173,6 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(20.dp))
             Text(
-                text = "和「我」有关的东西都在这一页；公共入口和通用设置放在「更多」。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
                 text = "资料更新于 ${formatUpdatedAt(updatedAt)} · 下拉或双击底部「我的」可刷新",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

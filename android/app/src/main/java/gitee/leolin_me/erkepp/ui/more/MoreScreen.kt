@@ -55,7 +55,7 @@ fun MoreScreen(
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "公共入口，以及说不清算不算「我的」的杂项。",
+            text = "全校通用的入口，和与本机有关的设置。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -67,7 +67,7 @@ fun MoreScreen(
             Column {
                 EntryRow(
                     title = "学分排行榜",
-                    subtitle = "成绩即学分，由学时折算（1 学时 = 0.025 学分）；按学分排名，并列同名次",
+                    subtitle = "成绩就是学分，由学时折算（1 学时 = 0.025 学分）",
                     onClick = onOpenRank,
                     showDivider = false,
                 )
@@ -83,12 +83,12 @@ fun MoreScreen(
                 // 不塞进课表页底部——那两件事不属于一张周课表（2026-11-15 用户指出）
                 EntryRow(
                     title = "成绩查询",
-                    subtitle = "教务成绩单，还没做",
+                    subtitle = "看每门课的成绩、学分与绩点",
                     onClick = { onComingSoon("成绩查询") },
                 )
                 EntryRow(
                     title = "考试安排",
-                    subtitle = "教务考试安排，还没做",
+                    subtitle = "看期末考试的时间、考场与座位号",
                     onClick = { onComingSoon("考试安排") },
                     showDivider = false,
                 )
@@ -135,7 +135,7 @@ fun MoreScreen(
 
         Spacer(Modifier.height(20.dp))
         Text(
-            text = "这里只放入口和设置，不放「我」的内容；「我的组织」「我的附件」「我的课表」都在「我的」里。",
+            text = "还有功能没搬进来？「打开官方页面」可以在网页版里完成剩下的操作。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
