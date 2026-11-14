@@ -176,7 +176,7 @@ internal fun parseRankPage(data: JsonElement, page: Int = 1, pageSize: Int = Ran
 internal fun parseRankEntry(element: JsonElement?): RankEntry? {
     val item = element as? JsonObject ?: return null
     return RankEntry(
-        rownum = item.int("rownum").let { if (it > 0) it else item.int("rank") },
+        rownum = item.rank("rownum").takeIf { it > 0 } ?: item.rank("rank"),
         userId = item.str("id").toLongOrNull() ?: 0L,
         name = item.str("name"),
         avatar = item.str("avatar").takeIf { it.isNotBlank() },
@@ -214,6 +214,19 @@ private fun JsonObject.str(key: String): String =
 
 private fun JsonObject.int(key: String): Int =
     (this[key] as? JsonPrimitive)?.intOrNull ?: 0
+
+/**
+ * 名次专用：官方把这个字段当「数字」用，但实测它**有时是整数、有时是小数**
+ * （2026-11-15 抓到过 `"rownum":39.0`），也可能是空串（0 学时、未上榜）。
+ *
+ * 只认 Int 会把 `39.0` 读成 0，界面上就变成一排「—」，这就是「排行榜有时整页都没有名次」
+ * 的来源。所以先按 Int 读，失败再按 Double 兜一次。
+ */
+private fun JsonObject.rank(key: String): Int {
+    val primitive = this[key] as? JsonPrimitive ?: return 0
+    primitive.intOrNull?.let { return it }
+    return primitive.contentOrNull?.trim()?.toDoubleOrNull()?.toInt() ?: 0
+}
 
 private fun JsonObject.boolean(key: String): Boolean? =
     (this[key] as? JsonPrimitive)?.booleanOrNull

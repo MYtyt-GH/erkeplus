@@ -21,7 +21,7 @@ class RankParseTest {
 
     private fun entry(
         rownum: String = "4",
-        name: String = "赵振国",
+        name: String = "某同学",
         score: Double = 0.0,
         hours: Double = 0.0,
         college: String = "数学与大数据学院",
@@ -35,7 +35,7 @@ class RankParseTest {
         gender = 1,
         score = score,
         hours = hours,
-        studentNo = "2026306588",
+        studentNo = "2026000001",
         collegeName = college,
         majorName = major,
         className = klass,
@@ -47,12 +47,12 @@ class RankParseTest {
     fun `page parses entries and derives lastPage when server omits it`() {
         val raw = """
             {"total":39,"pageSize":20,"pageNum":1,"list":[
-              {"hours":7.0,"code":"2026306614","gender":1,"campusName":"淮南校区","className":"信计26-3",
+              {"hours":7.0,"code":"2026000002","gender":1,"campusName":"淮南校区","className":"信计26-3",
                "avatar":"https://example.com/a.jpg","rownum":1,"score":0.175,"collegeName":"数学与大数据学院",
-               "grade":2026,"name":"王俊文","id":2497513,"majorName":"信息与计算科学"},
-              {"hours":3.0,"code":"2026306578","gender":2,"campusName":"淮南校区","className":"信计26-3",
+               "grade":2026,"name":"某同学乙","id":2497513,"majorName":"信息与计算科学"},
+              {"hours":3.0,"code":"2026000003","gender":2,"campusName":"淮南校区","className":"信计26-3",
                "avatar":"https://example.com/b.jpg","rownum":2,"score":0.075,"collegeName":"数学与大数据学院",
-               "grade":2026,"name":"夏晓毓","id":2497477,"majorName":"信息与计算科学"}
+               "grade":2026,"name":"某同学丙","id":2497477,"majorName":"信息与计算科学"}
             ]}
         """.trimIndent()
         val page = parseRankPage(json.parseToJsonElement(raw), page = 1, pageSize = 20)
@@ -65,8 +65,8 @@ class RankParseTest {
         assertEquals(1, first.rownum)
         // 点人名进人物主页靠这个 id，不能丢
         assertEquals(2497513L, first.userId)
-        assertEquals("王俊文", first.name)
-        assertEquals("2026306614", first.studentNo)
+        assertEquals("某同学乙", first.name)
+        assertEquals("2026000002", first.studentNo)
         assertEquals(0.175, first.score, 0.0001)
         assertEquals(7.0, first.hours, 0.0001)
         assertEquals("信息与计算科学", first.majorName)
@@ -81,8 +81,8 @@ class RankParseTest {
     fun `empty rownum becomes zero and a short page is the last one`() {
         val raw = """
             {"total":39,"pageSize":20,"pageNum":2,"list":[
-              {"hours":0.0,"code":"2026306580","gender":2,"className":"信计26-3","rownum":"",
-               "score":0.0,"collegeName":"数学与大数据学院","grade":2026,"name":"许可莹",
+              {"hours":0.0,"code":"2026000004","gender":2,"className":"信计26-3","rownum":"",
+               "score":0.0,"collegeName":"数学与大数据学院","grade":2026,"name":"某同学丁",
                "id":2497479,"majorName":"信息与计算科学","avatar":""}
             ]}
         """.trimIndent()
@@ -114,6 +114,32 @@ class RankParseTest {
         val page = parseRankPage(json.parseToJsonElement(raw), page = 1, pageSize = 20)
         assertEquals(1, page.total)
         assertTrue(page.lastPage)
+    }
+
+    @Test
+    fun `rownum 可能是小数或空串`() {
+        // 2026-11-15 实测抓到过 "rownum":39.0 —— 只认 Int 会读成 0，界面上一整页都是「—」
+        val raw = """
+            {"total":5,"pageSize":5,"pageNum":1,"list":[
+              {"rownum":39.0,"name":"a","score":1.1,"hours":44.0},
+              {"rownum":"40.0","name":"b","score":1.0,"hours":40.0},
+              {"rownum":41,"name":"c","score":0.9,"hours":36.0},
+              {"rownum":"42","name":"d","score":0.8,"hours":32.0},
+              {"rownum":"","name":"e","score":0.0,"hours":0.0}]}
+        """.trimIndent()
+        val page = parseRankPage(json.parseToJsonElement(raw), page = 1, pageSize = 5)
+        assertEquals(39, page.list[0].rownum)
+        assertEquals(40, page.list[1].rownum)
+        assertEquals(41, page.list[2].rownum)
+        assertEquals(42, page.list[3].rownum)
+        assertEquals("没有名次就是 0（界面显示「—」）", 0, page.list[4].rownum)
+    }
+
+    @Test
+    fun `rownum 缺失时退回 rank 字段`() {
+        val raw = """{"total":1,"pageSize":1,"pageNum":1,"list":[{"rank":7.0,"name":"a","score":0.1}]}"""
+        val page = parseRankPage(json.parseToJsonElement(raw), page = 1, pageSize = 1)
+        assertEquals(7, page.list.first().rownum)
     }
 
     @Test

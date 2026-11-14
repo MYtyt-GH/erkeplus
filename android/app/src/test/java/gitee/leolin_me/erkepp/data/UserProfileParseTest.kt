@@ -17,7 +17,7 @@ class UserProfileParseTest {
         {"politics":0,"hours":273.5,"politicsName":"","gender":1,"organizationName":"",
          "avatar":"https://x/a.jpg","dynamicCount":0,"organizationCount":3,"activityCount":32,
          "collegeName":"化工与爆破学院","isFollow":0,"identity":1,"schoolId":10361,
-         "name":"程子涛","id":1908337,"majorName":"弹药工程与爆炸技术",
+         "name":"某同学","id":1908337,"majorName":"弹药工程与爆炸技术",
          "personTag":[{"name":"电竞·游戏","id":2},{"name":"电影","id":3}]}
     """.trimIndent()
 
@@ -25,7 +25,7 @@ class UserProfileParseTest {
     fun `profile keeps the fields the page shows`() {
         val profile = parsePersonProfile(Json.parseToJsonElement(sample))
         assertEquals(1908337L, profile.id)
-        assertEquals("程子涛", profile.name)
+        assertEquals("某同学", profile.name)
         assertEquals(1, profile.gender)
         assertEquals(1, profile.identity)
         assertEquals("化工与爆破学院", profile.collegeName)

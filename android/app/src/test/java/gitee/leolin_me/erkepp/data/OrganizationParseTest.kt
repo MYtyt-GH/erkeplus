@@ -86,7 +86,7 @@ class OrganizationParseTest {
                 """
                 {"id":39261,"name":"人工智能协会","avatar":"","memberCount":343,
                  "nature":2,"natureName":"社团协会","categoryName":"学术科技类",
-                 "affiliationName":"安徽理工大学","chairmanName":"人工智能协会","guiderName":"朱宇",
+                 "affiliationName":"安徽理工大学","chairmanName":"人工智能协会","guiderName":"某同学戊",
                  "introduce":"大学生人工智能协会","energy":925.0,"orgProcessStatus":"re3",
                  "applyStatus":1,"isJoin":1,"isAdd":1,"rule":1}
                 """.trimIndent(),
@@ -236,7 +236,7 @@ class OrganizationParseTest {
                 {"id":17085,"name":"机器人协会","memberCount":1051,"activityCount":13,
                  "foundTime":1659379982000,"campusName":"淮南校区","parentName":"",
                  "affiliationName":"安徽理工大学","natureName":"社团协会",
-                 "categoryName":"文化体育类","guiderName":"郑江","identity":1,
+                 "categoryName":"文化体育类","guiderName":"某同学丁","identity":1,
                  "orgProcessStatus":"re3","applyStatus":2,"isJoin":1,"isAdd":1,"rule":2}
                 """.trimIndent(),
             ),
@@ -260,14 +260,14 @@ class OrganizationParseTest {
     private val memberJson = """
         {"managerList":[
            {"organizationName":"机器人协会","avatar":"","recordId":1,"collegeName":"人工智能学院",
-            "electId":553,"identity":1,"name":"孟露","duty":"副会长","id":1376658,
+            "electId":553,"identity":1,"name":"某同学丙","duty":"副会长","id":1376658,
             "majorName":"人工智能","avatar":"https://x/y.jpg"},
            {"organizationName":"机器人协会","avatar":"","recordId":2,"collegeName":"人工智能学院",
-            "electId":553,"identity":1,"name":"李梦臣","duty":"会长","id":1376788,
+            "electId":553,"identity":1,"name":"某同学甲","duty":"会长","id":1376788,
             "majorName":"机器人工程"}],
          "waitAuditMembers":113,
          "chairman":null,
-         "commonList":[{"name":"马志强","id":1682122,"avatar":"","duty":"",
+         "commonList":[{"name":"某同学乙","id":1682122,"avatar":"","duty":"",
                         "collegeName":"人工智能学院","majorName":""}]}
     """.trimIndent()
 
@@ -280,7 +280,7 @@ class OrganizationParseTest {
         assertEquals(113, members.waitAudit)
         // 服务端把副会长排前面；会长必须排第一，否则看起来像「没有会长」
         assertEquals(listOf("会长", "副会长"), members.leaders.map { it.duty })
-        assertEquals("李梦臣", members.leaders.first().name)
+        assertEquals("某同学甲", members.leaders.first().name)
         // 头像空串不当作图片地址，交给占位图
         assertNull(members.leaders.first().avatar)
         assertEquals("https://x/y.jpg", members.leaders.last().avatar)

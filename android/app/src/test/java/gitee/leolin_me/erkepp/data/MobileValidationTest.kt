@@ -8,7 +8,7 @@ class MobileValidationTest {
 
     @Test
     fun `accepts mainland numbers`() {
-        assertTrue(isValidMobile("19565866281"))
+        assertTrue(isValidMobile("13000000000"))
         assertTrue(isValidMobile("13000000000"))
     }
 
@@ -16,7 +16,7 @@ class MobileValidationTest {
     fun `rejects wrong shape`() {
         assertFalse(isValidMobile(""))
         assertFalse(isValidMobile("1956586628")) // 10 位
-        assertFalse(isValidMobile("195658662811")) // 12 位
+        assertFalse(isValidMobile("130000000001")) // 12 位
         assertFalse(isValidMobile("29565866281")) // 不是 1 开头
         assertFalse(isValidMobile("1956586628a"))
     }

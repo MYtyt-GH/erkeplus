@@ -61,4 +61,18 @@ if [ -n "$bad" ]; then
   exit 1
 fi
 
+# PII gate: no real student id / phone / id-card / token / person name in tracked
+# or about-to-be-added files. Raw captures belong in tem/ (gitignored), never here.
+# Skipped when PowerShell is not available (Linux/macOS contributors).
+if command -v powershell >/dev/null 2>&1; then
+  if ! powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-pii.ps1 >/dev/null 2>&1; then
+    echo "pre-commit: sensitive data found. Details:" >&2
+    powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-pii.ps1 >&2 || true
+    echo "" >&2
+    echo "  Redact with synthetic values (2026000001 / 13000000000 / synthetic name)," >&2
+    echo "  or put raw captures under tem/ which is gitignored." >&2
+    exit 1
+  fi
+fi
+
 exit 0

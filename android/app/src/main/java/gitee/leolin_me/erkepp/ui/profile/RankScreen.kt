@@ -118,7 +118,15 @@ fun RankScreen(
         error = null
         myRank = null
         load(1)
-        myRank = runCatching { repository.myRank(token, current) }.getOrNull()
+        val mine = runCatching { repository.myRank(token, current) }.getOrNull()
+        // self/rank 在榜单还没算好时会返回空名次（见上面那段注释）。这时拿榜单里同一个
+        // userId 的那一行兜底，别让底部固定的那一条只剩一个「—」。
+        myRank = if (mine != null && mine.rownum <= 0) {
+            val fromList = entries.firstOrNull { it.userId == mine.userId && it.rownum > 0 }
+            if (fromList != null) mine.copy(rownum = fromList.rownum) else mine
+        } else {
+            mine
+        }
     }
 
     val listState = rememberLazyListState()

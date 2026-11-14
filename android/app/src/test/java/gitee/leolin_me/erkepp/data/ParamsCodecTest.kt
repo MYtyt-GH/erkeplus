@@ -36,10 +36,10 @@ class ParamsCodecTest {
     fun `params are encoded exactly once`() {
         val params = buildJsonObject {
             put("schoolCode", JsonPrimitive("10361"))
-            put("code", JsonPrimitive("2026306588"))
+            put("code", JsonPrimitive("2026000001"))
         }
         assertEquals(
-            "%7B%22schoolCode%22%3A%2210361%22%2C%22code%22%3A%222026306588%22%7D",
+            "%7B%22schoolCode%22%3A%2210361%22%2C%22code%22%3A%222026000001%22%7D",
             ParamsCodec.encode(params),
         )
     }

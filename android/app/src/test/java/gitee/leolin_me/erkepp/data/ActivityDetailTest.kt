@@ -43,7 +43,7 @@ class ActivityDetailTest {
             {"attachmentType": 5, "name": "活动通知.pdf", "url": "https://example.com/a.pdf"},
             {"attachmentType": 1, "name": "海报.png", "url": "https://example.com/b.png"}
           ],
-          "manager": {"name": "刘昊辰", "id": 2197962}
+          "manager": {"name": "某同学", "id": 2197962}
         }
         """.trimIndent(),
     ).jsonObject
@@ -74,7 +74,7 @@ class ActivityDetailTest {
         assertEquals("PDF", detail.attachments[0].extension)
         assertEquals(1, detail.attachments[1].type)
         assertEquals("PNG", detail.attachments[1].extension)
-        assertEquals("刘昊辰", detail.managerName)
+        assertEquals("某同学", detail.managerName)
         assertEquals("non-member", detail.source)
         assertTrue(detail.hasRestriction)
     }
