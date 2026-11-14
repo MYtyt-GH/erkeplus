@@ -19,17 +19,26 @@ import androidx.compose.ui.unit.dp
 import gitee.leolin_me.erkepp.ui.EntryRow
 
 /**
- * 「更多」：底部导航的第四个入口，聚合「不属于发现、也不属于我」的页面。
+ * 「更多」：底部导航的第三个入口，放**不是「我」的**东西。
  *
- * 放这里的都是**公共入口**：所有组织、加入组织、修改个人资料、官方页面。
- * 「我的组织」不在这里——它是「我的」的一部分，放下面那页。
- * 以后做成原生的官方页面（成绩单、问卷、申报…）也先往这里加，不加底部 tab。
+ * 判定标准（2026-11-15 与用户确认）：离开「我」仍然成立 → 放这里。
+ * 所以「所有组织」「加入组织」「打开官方页面」「学分排行榜」在这里，而「我的组织」「我的附件」
+ * 「我的诚信值」都在「我的」页。**同一个目的地只能有一个人口**：
+ * 原来自里的「修改个人资料」和「我的 → 我的信息」是同一页，已经删掉这边那条。
+ *
+ * 唯一的例外是学分排行榜：榜单条目在这里，但「我的」页**学分那张数字卡**也是它的入口
+ * （点学分看明细是直觉动作）。用户确认保留这个例外，所以「我的」页列表里不再重复列它。
+ *
+ * 说不清归属的也算不强相关，同样走这里（例：数据管理管的是缓存、日志这类本机杂物，
+ * 不是「我的」资料）。以后做成原生的官方页面（成绩单、问卷、申报…）也先往这里加，
+ * 不给它单独开底部 tab。
  */
 @Composable
 fun MoreScreen(
     onOpenAllOrganizations: () -> Unit,
     onJoinOrganization: () -> Unit,
-    onOpenPersonalInfo: () -> Unit,
+    onOpenRank: () -> Unit,
+    onOpenStorage: () -> Unit,
     onOpenWeb: () -> Unit,
 ) {
     Column(
@@ -45,10 +54,24 @@ fun MoreScreen(
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "还没搬进底部导航的页面，都从这里进。",
+            text = "公共入口，以及说不清算不算「我的」的杂项。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        Spacer(Modifier.height(18.dp))
+        SectionLabel("榜单")
+        Spacer(Modifier.height(8.dp))
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column {
+                EntryRow(
+                    title = "学分排行榜",
+                    subtitle = "成绩即学分，由学时折算（1 学时 = 0.025 学分）；按学分排名，并列同名次",
+                    onClick = onOpenRank,
+                    showDivider = false,
+                )
+            }
+        }
 
         Spacer(Modifier.height(18.dp))
         SectionLabel("组织")
@@ -70,14 +93,14 @@ fun MoreScreen(
         }
 
         Spacer(Modifier.height(18.dp))
-        SectionLabel("账号")
+        SectionLabel("本机与网页")
         Spacer(Modifier.height(8.dp))
         Card(modifier = Modifier.fillMaxWidth()) {
             Column {
                 EntryRow(
-                    title = "修改个人资料",
-                    subtitle = "和「我的 → 详细资料」是同一页，改一个地方两处都变",
-                    onClick = onOpenPersonalInfo,
+                    title = "数据管理",
+                    subtitle = "缓存、日志、回收站的占用，可逐项清理",
+                    onClick = onOpenStorage,
                 )
                 EntryRow(
                     title = "打开官方页面",
@@ -90,7 +113,7 @@ fun MoreScreen(
 
         Spacer(Modifier.height(20.dp))
         Text(
-            text = "这里只放入口，不放新东西；没有对应页面的功能仍然走官方网页。",
+            text = "这里只放入口和设置，不放「我」的内容；「我的组织」「我的附件」「我的课表」都在「我的」里。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

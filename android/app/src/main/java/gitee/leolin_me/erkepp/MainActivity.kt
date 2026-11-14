@@ -341,7 +341,7 @@ class MainActivity : ComponentActivity() {
 
                 fun downloadAttachment(attachment: ActivityAttachment) {
                     Downloads.enqueue(activity, attachment.url, attachment.name, attachment.size)
-                    Toast.makeText(activity, "已开始下载，进度见「我的 → 附件」", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(activity, "已开始下载，进度见「我的附件」", Toast.LENGTH_SHORT).show()
                 }
 
                 fun handleAttachmentTap(attachment: ActivityAttachment) {
@@ -918,17 +918,20 @@ class MainActivity : ComponentActivity() {
                                             onOpenRank = { showRank = true },
                                             onOpenOrganizations = { showOrganizations = true },
                                             onOpenAttachments = { attachmentsVisible = true },
-                                            onOpenStorage = { showStorage = true },
-                                            onOpenWeb = { webUrl = AppConfig.HOME_URL },
+                                            onOpenTimetable = {
+                                                Toast.makeText(
+                                                    activity,
+                                                    "我的课表还在接入，敬请期待",
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            },
                                         )
 
                                         MainTab.MORE -> MoreScreen(
                                             onOpenAllOrganizations = { uiState = uiState.copy(showAllOrgs = true) },
                                             onJoinOrganization = { showJoinScan = true },
-                                            onOpenPersonalInfo = {
-                                                showPersonalInfo = true
-                                                reloadProfile()
-                                            },
+                                            onOpenRank = { showRank = true },
+                                            onOpenStorage = { showStorage = true },
                                             onOpenWeb = { webUrl = AppConfig.HOME_URL },
                                         )
 

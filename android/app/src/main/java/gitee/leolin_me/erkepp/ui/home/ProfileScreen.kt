@@ -35,10 +35,16 @@ import java.util.Calendar
 import java.util.Locale
 
 /**
- * 「我的」：个人信息、三个数字（学分 / 学时 / 诚信值）和入口。
+ * 「我的」：只放**和这个用户强相关**的东西，一律用「我的 X」命名。
  *
- * 原来只有一个问候语加两个按钮，太空。这一版把学号、年级这些能拿到的信息都摆出来，
- * 数字做成一行三卡，入口改成列表行。
+ * 判定标准（2026-11-15 与用户确认）：这件事离开「我」还成立吗？
+ * 成立就不属于这里——「所有组织」「打开官方页面」离开我也成立，归「更多」；
+ * 「缓存 / 日志 / 回收站占用」这种说不清是不是我的，也算不强相关，同样归「更多」。
+ *
+ * 结构：资料卡（点进「我的信息」）→ 一行三个数字→「我的 X」列表。
+ * 数字卡里只有「学分」可点（进成绩排行榜），另外两个纯展示；成绩排行榜是全校榜单，
+ * 它的**条目**放在「更多」，这里只借学分这个数字当入口，不在列表里重复一遍。
+ * 「我的课表」暂未接入，点进去只弹提示。
  *
  * 资料刷新由外面驱动（本次启动首次进入自动拉一次、下拉刷新、双击底部「我的」），
  * 本页不自己发起请求，只把「上次更新时间」显示出来、把下拉动作转达出去。
@@ -56,8 +62,7 @@ fun ProfileScreen(
     onOpenRank: () -> Unit,
     onOpenOrganizations: () -> Unit,
     onOpenAttachments: () -> Unit,
-    onOpenStorage: () -> Unit,
-    onOpenWeb: () -> Unit,
+    onOpenTimetable: () -> Unit,
 ) {
     val profile = session.profile
     PullToRefreshBox(
@@ -73,7 +78,7 @@ fun ProfileScreen(
         ) {
             Spacer(Modifier.height(24.dp))
 
-            // 资料卡整块可点：进「详细资料」，里面能看全信息、改密码手机号
+            // 资料卡整块可点：进「我的信息」，里面能看全信息、改密码手机号
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -100,7 +105,7 @@ fun ProfileScreen(
                     }
                 }
                 Text(
-                    text = "详细资料 ›",
+                    text = "我的信息 ›",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -124,6 +129,8 @@ fun ProfileScreen(
                     // 和排行榜用同一个格式化：最多三位小数、去尾零。
                     // 学分是 hours × 0.025，21 学时是 0.525，按一位小数显示会被截成 0.5
                     value = rankScoreText(profile.score),
+                    // 数字本身就是通往明细的门：点学分进成绩排行榜。
+                    // 排行榜不在这页的列表里出现——它是公共榜单，条目在「更多」
                     modifier = Modifier
                         .weight(1f)
                         .clickable(onClick = onOpenRank),
@@ -132,9 +139,7 @@ fun ProfileScreen(
                 StatCard(
                     label = "诚信值",
                     value = credit?.let { formatScore(it.credit) } ?: formatScore(profile.credit),
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable(onClick = onOpenCredit),
+                    modifier = Modifier.weight(1f),
                 )
             }
 
@@ -143,14 +148,14 @@ fun ProfileScreen(
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column {
                     EntryRow(
+                        title = "我的诚信值",
+                        subtitle = "守约记录、失约记录与申诉",
+                        onClick = onOpenCredit,
+                    )
+                    EntryRow(
                         title = "我的组织",
                         subtitle = "我加入的、我创建的、我退出的，以及待审核的申请",
                         onClick = onOpenOrganizations,
-                    )
-                    EntryRow(
-                        title = "诚信值",
-                        subtitle = "守约记录、失约记录与申诉",
-                        onClick = onOpenCredit,
                     )
                     EntryRow(
                         title = "我的附件",
@@ -158,14 +163,9 @@ fun ProfileScreen(
                         onClick = onOpenAttachments,
                     )
                     EntryRow(
-                        title = "数据管理",
-                        subtitle = "缓存、日志、回收站的占用，可逐项清理",
-                        onClick = onOpenStorage,
-                    )
-                    EntryRow(
-                        title = "打开官方页面",
-                        subtitle = "网页版完整功能：成绩单、组织、问卷等",
-                        onClick = onOpenWeb,
+                        title = "我的课表",
+                        subtitle = "教务系统的课表，正在接入，敬请期待",
+                        onClick = onOpenTimetable,
                         showDivider = false,
                     )
                 }
@@ -173,7 +173,7 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(20.dp))
             Text(
-                text = "其余页面会陆续换成原生界面；暂时没有的，走上面那个官方网页入口。",
+                text = "和「我」有关的东西都在这一页；公共入口和通用设置放在「更多」。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

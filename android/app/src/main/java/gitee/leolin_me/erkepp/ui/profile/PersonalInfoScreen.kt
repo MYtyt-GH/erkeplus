@@ -89,7 +89,7 @@ fun PersonalInfoScreen(
         ) {
             TextButton(onClick = onBack) { Text("返回") }
             Text(
-                text = "详细资料",
+                text = "我的信息",
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.weight(1f),
             )

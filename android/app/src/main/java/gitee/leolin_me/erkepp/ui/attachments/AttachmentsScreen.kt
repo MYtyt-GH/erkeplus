@@ -54,7 +54,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 「我的 → 附件」：下载进度、已下载文件管理、回收站。
+ * 「我的附件」：下载进度、已下载文件管理、回收站。
  *
  * 两种视图：分条列表与双列卡片，图片都显示缩略图（文件名对用户没有意义）。
  * 删除有二次确认，并可选择放进系统回收站，勾选状态会被记住。
@@ -116,7 +116,7 @@ fun AttachmentsScreen(
         ) {
             TextButton(onClick = { if (inTrash) onInTrashChange(false) else onBack() }) { Text("返回") }
             Text(
-                text = if (inTrash) "回收站" else "附件",
+                text = if (inTrash) "回收站" else "我的附件",
                 style = MaterialTheme.typography.titleMedium,
             )
             Spacer(Modifier.weight(1f))
