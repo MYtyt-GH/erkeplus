@@ -139,12 +139,12 @@ class AppPreferences(context: Context) {
     var loadStatuses: Set<Int> by prefCategories(KEY_LOAD_STATUSES, DEFAULT_LOAD_STATUSES)
 
     /**
-     * 会话里缓存的个人资料版本。
+     * 上次成功拉取 `my-info` 的时间（毫秒时间戳，0 表示还没拉过）。
      *
-     * 加了新字段（头像、学分）后，老会话里没有这些值；版本低于当前值时补拉一次 `my-info`，
-     * 拉完写回就不再多请求。
+     * 「我的」页只在**本次启动首次进入**时自动刷新一次，之后靠下拉刷新或双击底部「我的」手动拉；
+     * 这个值既用于底部小字显示，也让用户自己判断资料旧不旧。
      */
-    var profileSchema: Int by prefInt(KEY_PROFILE_SCHEMA, 0)
+    var profileUpdatedAt: Long by prefLong(KEY_PROFILE_UPDATED_AT, 0L)
 
     private fun prefBoolean(key: String, default: Boolean) = object : ReadWriteProperty<Any?, Boolean> {
         private var state by mutableStateOf(store.getBoolean(key, default))
@@ -167,6 +167,18 @@ class AppPreferences(context: Context) {
             if (state == value) return
             state = value
             store.edit().putInt(key, value).apply()
+        }
+    }
+
+    private fun prefLong(key: String, default: Long) = object : ReadWriteProperty<Any?, Long> {
+        private var state by mutableStateOf(store.getLong(key, default))
+
+        override fun getValue(thisRef: Any?, property: KProperty<*>): Long = state
+
+        override fun setValue(thisRef: Any?, property: KProperty<*>, value: Long) {
+            if (state == value) return
+            state = value
+            store.edit().putLong(key, value).apply()
         }
     }
 
@@ -227,7 +239,7 @@ class AppPreferences(context: Context) {
         const val KEY_CARD_TEXT = "card_custom_text"
         const val KEY_DEVELOPER = "developer_mode"
         const val KEY_LOAD_STATUSES = "load_statuses"
-        const val KEY_PROFILE_SCHEMA = "profile_schema"
+        const val KEY_PROFILE_UPDATED_AT = "profile_updated_at"
         const val KEY_STORAGE_SELECTION = "storage_selection"
 
         val DEFAULT_CATEGORIES = setOf(1440, 1441, 1444)
