@@ -1,0 +1,29 @@
+{
+  "_comment": "PII gate allowlists. Synthetic values only; nothing here may be a real person.",
+  "_why_semester_codes": "20xxxxxxxx that are semester codes (2026202701 = 2026-2027 第1学期), not student ids",
+  "values": [
+    "2026000001",
+    "2026000002",
+    "2026000003",
+    "2026000004",
+    "2026202701",
+    "2025202602",
+    "13000000000",
+    "13800000000",
+    "0000000000000000000000000000000000000000"
+  ],
+  "names": [
+    "空活动",
+    "坏数据",
+    "主席",
+    "电影",
+    "关键字",
+    "最热",
+    "最活跃",
+    "全部",
+    "其他",
+    "志愿组织",
+    "某人"
+  ],
+  "name_prefix_synthetic": "某"
+}

@@ -21,7 +21,7 @@ class RankParseTest {
 
     private fun entry(
         rownum: String = "4",
-        name: String = "赵振国",
+        name: String = "某同学",
         score: Double = 0.0,
         hours: Double = 0.0,
         college: String = "数学与大数据学院",
@@ -35,7 +35,7 @@ class RankParseTest {
         gender = 1,
         score = score,
         hours = hours,
-        studentNo = "2026306588",
+        studentNo = "2026000001",
         collegeName = college,
         majorName = major,
         className = klass,
@@ -47,12 +47,12 @@ class RankParseTest {
     fun `page parses entries and derives lastPage when server omits it`() {
         val raw = """
             {"total":39,"pageSize":20,"pageNum":1,"list":[
-              {"hours":7.0,"code":"2026306614","gender":1,"campusName":"淮南校区","className":"信计26-3",
+              {"hours":7.0,"code":"2026000002","gender":1,"campusName":"淮南校区","className":"信计26-3",
                "avatar":"https://example.com/a.jpg","rownum":1,"score":0.175,"collegeName":"数学与大数据学院",
-               "grade":2026,"name":"王俊文","id":2497513,"majorName":"信息与计算科学"},
-              {"hours":3.0,"code":"2026306578","gender":2,"campusName":"淮南校区","className":"信计26-3",
+               "grade":2026,"name":"某同学乙","id":2497513,"majorName":"信息与计算科学"},
+              {"hours":3.0,"code":"2026000003","gender":2,"campusName":"淮南校区","className":"信计26-3",
                "avatar":"https://example.com/b.jpg","rownum":2,"score":0.075,"collegeName":"数学与大数据学院",
-               "grade":2026,"name":"夏晓毓","id":2497477,"majorName":"信息与计算科学"}
+               "grade":2026,"name":"某同学丙","id":2497477,"majorName":"信息与计算科学"}
             ]}
         """.trimIndent()
         val page = parseRankPage(json.parseToJsonElement(raw), page = 1, pageSize = 20)
@@ -65,8 +65,8 @@ class RankParseTest {
         assertEquals(1, first.rownum)
         // 点人名进人物主页靠这个 id，不能丢
         assertEquals(2497513L, first.userId)
-        assertEquals("王俊文", first.name)
-        assertEquals("2026306614", first.studentNo)
+        assertEquals("某同学乙", first.name)
+        assertEquals("2026000002", first.studentNo)
         assertEquals(0.175, first.score, 0.0001)
         assertEquals(7.0, first.hours, 0.0001)
         assertEquals("信息与计算科学", first.majorName)
@@ -81,8 +81,8 @@ class RankParseTest {
     fun `empty rownum becomes zero and a short page is the last one`() {
         val raw = """
             {"total":39,"pageSize":20,"pageNum":2,"list":[
-              {"hours":0.0,"code":"2026306580","gender":2,"className":"信计26-3","rownum":"",
-               "score":0.0,"collegeName":"数学与大数据学院","grade":2026,"name":"许可莹",
+              {"hours":0.0,"code":"2026000004","gender":2,"className":"信计26-3","rownum":"",
+               "score":0.0,"collegeName":"数学与大数据学院","grade":2026,"name":"某同学丁",
                "id":2497479,"majorName":"信息与计算科学","avatar":""}
             ]}
         """.trimIndent()

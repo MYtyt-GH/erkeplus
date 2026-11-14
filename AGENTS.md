@@ -18,6 +18,10 @@
    `adb` / `git` 的只读探查可以自行做。
 6. **不写没验证过的结论**。接口行为、库行为、系统行为，本机没跑过就别写进文档或注释；
    必要时写「未验证」并注明探查方法。
+7. **敏感数据不许进工作区**。抓包原文、真实响应体、含姓名/学号/手机号/token 的材料一律写到
+   `tem/`（已在 `.gitignore` 里），不要放进 `docs/`、测试样本或注释里。
+   入库的示例一律用合成值：`2026000001`、`13000000000`、`某同学`。
+   提交前 `tools/check-pii.ps1` 必须返回 0（`pre-commit` 钩子已经强制）。
 
 ## 二、目录
 
@@ -59,6 +63,17 @@ $env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'
 ```
 
 报告在 `android/app/build/reports/tests/testDebugUnitTest/index.html`。
+
+敏感数据闸门（提交前必跑）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\check-pii.ps1
+```
+
+扫全部受版本控制的文本文件 + 未跟踪的新文件，命中真实学号 / 手机号 / 身份证 / token /
+疑似真实姓名就返回 1。测试用的合成值（`2026000001`、`13000000000`、`某同学`）在
+`tools/pii-allowlist.json` 里白名单。`-SelfTest` 会先用假样本验证检测器本身有效。
+脚本本身只能写 ASCII（PS 5.1 按 ANSI 解析），中文白名单放在那个 JSON 里。
 
 真机：
 

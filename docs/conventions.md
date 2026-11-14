@@ -64,6 +64,26 @@ git config core.hooksPath .githooks
 
 - `build.ps1` / `build.cmd` 只允许 ASCII 字符：Windows PowerShell 5.1 会按 ANSI 读取无 BOM 的 `.ps1`，中文注释会导致解析失败。
 - 构建脚本必须自行固定 JDK，不依赖调用者 PATH 里的 `java`。
+- 需要中文的表放在 `.json` 里（UTF-8 由 .NET 显式按 UTF-8 读），别塞回 `.ps1`。
+  `tools/check-pii.ps1` + `tools/pii-allowlist.json` 就是这么拆的：脚本全 ASCII，
+  中文白名单在 JSON 里。
+
+## 敏感数据（2026-11-15 起强制）
+
+文档与测试里不允许出现真实学号、姓名、手机号、身份号、token。合成值统一用：
+`2026000001` 这类学号、`13000000000` 这类手机号、`某同学`/`某老师` 这类姓名。
+
+**抓包原文、真实响应体一律写到 `tem/`**（已被 `.gitignore` 忽略），不要贴进 `docs/`、
+测试样本或代码注释。需要留证的，写「验证日期 + 文件在 tem/ 下」即可，正文用合成值复述结构。
+
+提交前跑一遍闸门，它会扫受版本控制的文件 + 未跟踪的新文件：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\check-pii.ps1
+```
+
+返回 1 就不要提交。已经泄露过的真实姓名/学号在 git 历史里，换文件不能消掉它，
+要彻底清除只能改写历史（会改变 commit hash，并与派生项目分叉），那是单独一次操作，需用户决定。
 
 ## 完成的定义（DoD）
 
@@ -73,4 +93,5 @@ git config core.hooksPath .githooks
 2. 纯逻辑部分有单元测试且通过；
 3. 真机走查通过，异常路径（断网、返回键、旋转）无崩溃；
 4. `CHANGELOG.md` 与版本号已更新；
-5. 相关文档同步，接口类改动附验证日期。
+5. 相关文档同步，接口类改动附验证日期；
+6. `tools/check-pii.ps1` 返回 0。

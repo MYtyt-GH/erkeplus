@@ -17,14 +17,14 @@ class FormEncodingTest {
     fun `form body carries params double encoded on the wire`() {
         val params = buildJsonObject {
             put("schoolCode", JsonPrimitive("10361"))
-            put("code", JsonPrimitive("2026306588"))
+            put("code", JsonPrimitive("2026000001"))
         }
         val body = FormBody.Builder().add("params", ParamsCodec.encode(params)).build()
         val buffer = Buffer()
         body.writeTo(buffer)
 
         assertEquals(
-            "params=%257B%2522schoolCode%2522%253A%252210361%2522%252C%2522code%2522%253A%25222026306588%2522%257D",
+            "params=%257B%2522schoolCode%2522%253A%252210361%2522%252C%2522code%2522%253A%25222026000001%2522%257D",
             buffer.readUtf8(),
         )
     }
