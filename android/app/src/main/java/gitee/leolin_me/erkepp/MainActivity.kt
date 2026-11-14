@@ -956,6 +956,9 @@ class MainActivity : ComponentActivity() {
                                             onOpenRank = { showRank = true },
                                             onOpenStorage = { showStorage = true },
                                             onOpenWeb = { webUrl = AppConfig.HOME_URL },
+                                            onComingSoon = { name ->
+                                                Toast.makeText(activity, "$name 还没做，敬请期待", Toast.LENGTH_SHORT).show()
+                                            },
                                         )
 
                                         MainTab.SETTINGS -> SettingsScreen(

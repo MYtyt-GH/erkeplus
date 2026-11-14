@@ -156,6 +156,19 @@ class EamsParseTest {
         assertNull(TimetableJson.decode("") )
     }
 
+    @Test
+    fun `学期缓存往返不丢字段`() {
+        val original = semester()
+        val decoded = TimetableJson.decodeSemester(TimetableJson.encodeSemester(original))
+        assertEquals(original, decoded)
+    }
+
+    @Test
+    fun `坏学期缓存返回 null`() {
+        assertNull(TimetableJson.decodeSemester("不是 JSON"))
+        assertNull(TimetableJson.decodeSemester("""{"id":"340"}"""))
+    }
+
     private fun semester() = EamsSemester(
         id = "340",
         year = "2026-2027",

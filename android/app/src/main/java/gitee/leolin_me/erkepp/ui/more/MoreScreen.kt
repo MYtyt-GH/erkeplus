@@ -40,6 +40,7 @@ fun MoreScreen(
     onOpenRank: () -> Unit,
     onOpenStorage: () -> Unit,
     onOpenWeb: () -> Unit,
+    onComingSoon: (String) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -68,6 +69,27 @@ fun MoreScreen(
                     title = "学分排行榜",
                     subtitle = "成绩即学分，由学时折算（1 学时 = 0.025 学分）；按学分排名，并列同名次",
                     onClick = onOpenRank,
+                    showDivider = false,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(18.dp))
+        SectionLabel("教务")
+        Spacer(Modifier.height(8.dp))
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column {
+                // 课表本页在「我的」里；成绩与考试还没做，入口先放这里，
+                // 不塞进课表页底部——那两件事不属于一张周课表（2026-11-15 用户指出）
+                EntryRow(
+                    title = "成绩查询",
+                    subtitle = "教务成绩单，还没做",
+                    onClick = { onComingSoon("成绩查询") },
+                )
+                EntryRow(
+                    title = "考试安排",
+                    subtitle = "教务考试安排，还没做",
+                    onClick = { onComingSoon("考试安排") },
                     showDivider = false,
                 )
             }

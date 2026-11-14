@@ -1,9 +1,8 @@
 package gitee.leolin_me.erkepp.ui.timetable
 
-import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,7 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -52,7 +50,7 @@ import gitee.leolin_me.erkepp.data.eams.EamsException
 import gitee.leolin_me.erkepp.data.eams.EamsLesson
 import gitee.leolin_me.erkepp.data.eams.EamsRepository
 import gitee.leolin_me.erkepp.data.eams.EamsSemester
-import gitee.leolin_me.erkepp.data.eams.EamsSemesterList
+import gitee.leolin_me.erkepp.data.eams.EamsSession
 import gitee.leolin_me.erkepp.data.eams.EamsSessionStore
 import gitee.leolin_me.erkepp.data.eams.SemesterCalendar
 import gitee.leolin_me.erkepp.data.eams.TimetableCache
@@ -68,13 +66,16 @@ import java.util.Locale
 /**
  * 「我的课表」：教务课表的原生化，数据来自 `jwglyd`（设计与取舍见 docs/design/timetable.md）。
  *
- * 这一页自己管三件事：
- * 1. 凭据：进来先读 [EamsSessionStore]；没有就弹登录表单，登录成功后按用户的选择决定存不存；
- * 2. 数据：按「学期 + 周」取，先用 [TimetableCache] 的缓存铺屏，再联网刷新；
- * 3. 兜底：联网失败保留缓存并写明「显示的是几点抓的课表」，绝不把空结果当真课表。
+ * 三条硬规则：
+ * 1. **缓存先上屏**：学期与课程都缓存，所以没登录、没网络也能看到上次抓的课表，
+ *    并在顶部写清「显示的是几点抓的」；
+ * 2. **联网只是刷新**：刷新失败不影响已显示的缓存；刷新成功才覆盖；
+ * 3. **清凭据不等于清课表**：用户清掉教务凭据后，缓存的课表仍然留着。
  *
- * 周表格用固定行高 + 绝对定位画课程块：一次课跨 `startUnit..endUnit` 行。
- * 单双周、连堂课不用额外处理——服务端已经把每次课拆成独立记录。
+ * 实现上有个坑值得记一笔：加载函数一律把「学期/会话」当参数传进去，
+ * 不要读 `semester` / `session` 这两个 state。Compose 的 `LaunchedEffect` 拿到的是
+ * 启动那一刻的闭包，登录成功后立刻在里面读 `semester` 还是旧值（null），
+ * 表现就是「登录完成但一直转圈、切一次周才出现」（2026-11-15 真机踩到）。
  */
 @Composable
 fun TimetableScreen(
@@ -83,34 +84,33 @@ fun TimetableScreen(
     cache: TimetableCache,
     onBack: () -> Unit,
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     var session by remember { mutableStateOf(sessionStore.load()) }
-    var semesterList by remember { mutableStateOf<EamsSemesterList?>(null) }
+    var semester by remember { mutableStateOf(cache.loadSemester()) }
+    var semestersLoaded by remember { mutableStateOf(false) }
     var maxUnit by remember { mutableIntStateOf(DEFAULT_UNIT) }
     var week by remember { mutableIntStateOf(0) }
     var lessons by remember { mutableStateOf<List<EamsLesson>>(emptyList()) }
     var fetchedAt by remember { mutableLongStateOf(0L) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var showLogin by remember { mutableStateOf(session == null) }
+    var showLogin by remember { mutableStateOf(false) }
     var loginError by remember { mutableStateOf<String?>(null) }
     var detail by remember { mutableStateOf<EamsLesson?>(null) }
 
     val today = remember { LocalDate.now() }
-    val semester = semesterList?.current()
     val currentWeek = semester?.let { SemesterCalendar.weekOf(it, today) } ?: 0
 
-    suspend fun loadWeek(target: Int) {
-        val current = semester ?: return
+    fun applyCache(current: EamsSemester, target: Int) {
+        val cached = cache.load(current.id, SemesterCalendar.weekStart(current, target)) ?: return
+        lessons = cached.lessons
+        fetchedAt = cached.fetchedAt
+    }
+
+    suspend fun refreshWeek(active: EamsSession, current: EamsSemester, target: Int) {
         val start = SemesterCalendar.weekStart(current, target)
-        // 先上缓存：进页面立刻有内容，不转圈
-        cache.load(current.id, start)?.let {
-            lessons = it.lessons
-            fetchedAt = it.fetchedAt
-        }
-        val active = session ?: return
+        applyCache(current, target)
         loading = true
         error = null
         try {
@@ -120,9 +120,9 @@ fun TimetableScreen(
             fetchedAt = saved.fetchedAt
         } catch (failure: Throwable) {
             if (failure is EamsException && failure.tokenInvalid) {
-                // token 过期：清掉「记住」的凭据，回到登录表单
                 sessionStore.clear()
                 session = null
+                semestersLoaded = false
                 showLogin = true
                 loginError = "登录已过期，请重新输入教务账号"
             }
@@ -132,37 +132,78 @@ fun TimetableScreen(
         }
     }
 
-    // 有会话就把学期、每天节数、当前周拉齐，再取这一周
-    LaunchedEffect(session) {
-        val active = session ?: return@LaunchedEffect
-        if (semesterList != null) return@LaunchedEffect
+    suspend fun refreshAll(active: EamsSession) {
         loading = true
         error = null
         try {
             val list = repository.semesters(active)
-            semesterList = list
+            val current = list.current() ?: throw EamsException("no_semester", "教务没有返回学期信息")
+            semester = current
+            cache.saveSemester(current)
+            semestersLoaded = true
             maxUnit = runCatching { repository.maxUnit(active) }
                 .getOrDefault(DEFAULT_UNIT)
                 .coerceAtLeast(MIN_UNIT)
-            val target = list.current()?.let { SemesterCalendar.weekOf(it, today) } ?: 1
+            val target = if (week > 0) week else SemesterCalendar.weekOf(current, today)
             week = target
-            loadWeek(target)
+            applyCache(current, target)
+            refreshWeek(active, current, target)
         } catch (failure: Throwable) {
             if (failure is EamsException && failure.tokenInvalid) {
                 sessionStore.clear()
                 session = null
+                semestersLoaded = false
                 showLogin = true
+                loginError = "登录已过期，请重新输入教务账号"
             }
             error = failure.eamsMessage()
             loading = false
         }
     }
 
+    // 进页面：先用缓存的学期把周次定下来并把课表铺上（离线也能看）
+    LaunchedEffect(Unit) {
+        val cached = semester
+        if (cached != null) {
+            val target = SemesterCalendar.weekOf(cached, today)
+            week = target
+            applyCache(cached, target)
+        } else if (session == null) {
+            // 既没缓存也没凭据：只能先登录
+            showLogin = true
+        }
+    }
+
+    // 有会话就联网刷新一次；登录成功后 semestersLoaded 会被重置，这里会再跑
+    LaunchedEffect(session) {
+        val active = session ?: return@LaunchedEffect
+        if (semestersLoaded) return@LaunchedEffect
+        refreshAll(active)
+    }
+
     fun goWeek(target: Int) {
         val current = semester ?: return
         if (!SemesterCalendar.hasWeek(current, target)) return
         week = target
-        scope.launch { loadWeek(target) }
+        applyCache(current, target)
+        val active = session ?: return
+        scope.launch { refreshWeek(active, current, target) }
+    }
+
+    fun refreshNow() {
+        val active = session
+        if (active == null) {
+            showLogin = true
+            return
+        }
+        scope.launch {
+            val current = semester
+            if (current == null || !semestersLoaded) {
+                refreshAll(active)
+            } else {
+                refreshWeek(active, current, week.coerceAtLeast(1))
+            }
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -172,7 +213,7 @@ fun TimetableScreen(
             fetchedAt = fetchedAt,
             loading = loading,
             onBack = onBack,
-            onUpdate = { if (session == null) showLogin = true else scope.launch { loadWeek(week) } },
+            onUpdate = { refreshNow() },
         )
 
         Column(
@@ -181,15 +222,32 @@ fun TimetableScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 12.dp),
         ) {
-            if (semester != null && week > 0) {
-                Summary(semester = semester, week = week, lessons = lessons, today = today, currentWeek = currentWeek)
+            // 状态变量是 delegated property，不能直接 smart cast；先落成本地值再用
+            val shownSemester = semester
+            if (shownSemester != null && week > 0) {
+                Summary(
+                    semester = shownSemester,
+                    week = week,
+                    lessons = lessons,
+                    today = today,
+                    currentWeek = currentWeek,
+                )
                 WeekBar(
                     week = week,
                     currentWeek = currentWeek,
-                    maxWeek = SemesterCalendar.weekCount(semester),
+                    maxWeek = SemesterCalendar.weekCount(shownSemester),
                     onPrev = { goWeek(week - 1) },
                     onNext = { goWeek(week + 1) },
                     onThisWeek = { goWeek(currentWeek) },
+                )
+            }
+
+            if (session == null && shownSemester != null) {
+                Text(
+                    text = "未登录教务：下面是本地缓存的课表，点上面的「更新」登录后可刷新",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 4.dp),
                 )
             }
 
@@ -202,18 +260,18 @@ fun TimetableScreen(
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(vertical = 6.dp),
+                    modifier = Modifier.padding(vertical = 4.dp),
                 )
             }
 
             when {
-                session == null -> EmptyHint("还没有登录教务。点上面的「更新」，输入学号和密码")
-                semester == null -> EmptyHint("正在读取学期信息…")
-                lessons.isEmpty() && !loading -> EmptyHint(
-                    if (error == null) "这一周没有课" else "暂时拿不到课表",
-                )
+                shownSemester == null && session == null ->
+                    EmptyHint("还没有登录教务。点上面的「更新」，输入学号和密码")
+                shownSemester == null -> EmptyHint("正在读取学期信息…")
+                lessons.isEmpty() && loading -> EmptyHint("正在加载课表…")
+                lessons.isEmpty() -> EmptyHint("这一周没有课，或者还没有缓存")
                 else -> WeekGrid(
-                    weekStart = SemesterCalendar.weekStart(semester, week.coerceAtLeast(1)),
+                    weekStart = SemesterCalendar.weekStart(shownSemester, week.coerceAtLeast(1)),
                     lessons = lessons,
                     maxUnit = maxUnit,
                     today = today,
@@ -222,16 +280,16 @@ fun TimetableScreen(
             }
 
             Spacer(Modifier.height(16.dp))
-            PlaceholderRow("成绩查询") { Toast.makeText(context, "成绩查询还没做，敬请期待", Toast.LENGTH_SHORT).show() }
-            PlaceholderRow("考试安排") { Toast.makeText(context, "考试安排还没做，敬请期待", Toast.LENGTH_SHORT).show() }
 
             if (sessionStore.remembered()) {
                 Spacer(Modifier.height(8.dp))
+                // 清凭据不清课表：缓存留着，离线还能看
                 TextButton(
                     onClick = {
                         sessionStore.clear()
                         session = null
-                        showLogin = true
+                        semestersLoaded = false
+                        error = "已清除登录凭据；课表来自本地缓存，点「更新」可重新登录"
                     },
                 ) { Text("清除记住的登录凭据") }
             }
@@ -251,11 +309,7 @@ fun TimetableScreen(
                     try {
                         val fresh = repository.login(userCode, password)
                         if (remember) sessionStore.save(fresh) else sessionStore.clear()
-                        // 换账号：把上一份学期与课表清干净，让 LaunchedEffect 重新拉
-                        semesterList = null
-                        lessons = emptyList()
-                        fetchedAt = 0L
-                        error = null
+                        semestersLoaded = false
                         loginError = null
                         session = fresh
                         showLogin = false
@@ -360,7 +414,7 @@ private fun WeekBar(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         TextButton(onClick = onPrev, enabled = week > 1) { Text("上一周") }
-        TextButton(onClick = onThisWeek, enabled = week != currentWeek) { Text("本周") }
+        TextButton(onClick = onThisWeek, enabled = currentWeek > 0 && week != currentWeek) { Text("本周") }
         TextButton(onClick = onNext, enabled = week < maxWeek) { Text("下一周") }
         Spacer(Modifier.weight(1f))
         Text(
@@ -379,114 +433,147 @@ private fun WeekGrid(
     today: LocalDate,
     onOpen: (EamsLesson) -> Unit,
 ) {
-    val rowHeight = 52.dp
+    // 一屏放不下 7 天就横向滑：宁可滑，也不要把课程名和教室压成一两个字。
+    // 左侧固定一列节次，右边整块（表头 + 网格）共用一个横向滚动状态，保证列对齐。
+    val columnWidth = 112.dp
+    val gutterWidth = 30.dp
+    val rowHeight = 74.dp
+    val headerHeight = 38.dp
+    val hScroll = rememberScrollState()
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth()) {
-            repeat(7) { index ->
-                val date = weekStart.plusDays(index.toLong())
-                val isToday = date == today
-                Column(
-                    modifier = Modifier.weight(1f).padding(vertical = 4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(
-                        text = WEEK_LABELS[index],
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isToday) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
-                    Text(
-                        text = date.dayOfMonth.toString(),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (isToday) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
-                }
-            }
-        }
-
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(rowHeight * maxUnit.toFloat())) {
-            val columnWidth = maxWidth / 7f
-            repeat(8) { index ->
-                Box(
-                    modifier = Modifier
-                        .offset(x = columnWidth * index.toFloat())
-                        .width(1.dp)
-                        .height(rowHeight * maxUnit.toFloat())
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                )
-            }
-            repeat(maxUnit + 1) { index ->
-                Box(
-                    modifier = Modifier
-                        .offset(y = rowHeight * index.toFloat())
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                )
-            }
-            lessons.forEach { lesson ->
-                val day = ChronoUnit.DAYS.between(weekStart, lesson.date).toInt()
-                if (day !in 0..6) return@forEach
-                val start = (lesson.startUnit - 1).coerceAtLeast(0)
-                val span = (lesson.endUnit - lesson.startUnit + 1).coerceAtLeast(1)
-                val isToday = lesson.date == today
-                Box(
-                    modifier = Modifier
-                        .offset(
-                            x = columnWidth * day.toFloat() + 1.dp,
-                            y = rowHeight * start.toFloat() + 1.dp,
-                        )
-                        .width(columnWidth - 2.dp)
-                        .height(rowHeight * span.toFloat() - 2.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(
-                            if (isToday) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.secondaryContainer
-                            },
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = RoundedCornerShape(6.dp),
-                        )
-                        .clickable { onOpen(lesson) }
-                        .padding(horizontal = 3.dp, vertical = 3.dp),
-                ) {
-                    Column {
-                        Text(
-                            text = lesson.courseName,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = if (span >= 2) 3 else 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (lesson.roomNames.isNotEmpty()) {
+            // 左上角留白，和表头对齐
+            Spacer(Modifier.width(gutterWidth).height(headerHeight))
+            Box(modifier = Modifier.weight(1f).horizontalScroll(hScroll)) {
+                Row {
+                    repeat(7) { index ->
+                        val date = weekStart.plusDays(index.toLong())
+                        val isToday = date == today
+                        Column(
+                            modifier = Modifier.width(columnWidth).height(headerHeight),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
                             Text(
-                                text = lesson.roomNames,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                                text = "${WEEK_LABELS[index]} ${date.dayOfMonth}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
+                                color = if (isToday) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
                             )
                         }
                     }
                 }
             }
         }
+
+        Row(modifier = Modifier.fillMaxWidth()) {
+            // 节次栏
+            Column(modifier = Modifier.width(gutterWidth)) {
+                repeat(maxUnit) { index ->
+                    Box(modifier = Modifier.height(rowHeight), contentAlignment = Alignment.TopCenter) {
+                        Text(
+                            text = "${index + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                }
+            }
+
+            Box(modifier = Modifier.weight(1f).horizontalScroll(hScroll)) {
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .width(columnWidth * 7f)
+                        .height(rowHeight * maxUnit.toFloat()),
+                ) {
+                    repeat(8) { index ->
+                        Box(
+                            modifier = Modifier
+                                .offset(x = columnWidth * index.toFloat())
+                                .width(1.dp)
+                                .height(rowHeight * maxUnit.toFloat())
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                        )
+                    }
+                    repeat(maxUnit + 1) { index ->
+                        Box(
+                            modifier = Modifier
+                                .offset(y = rowHeight * index.toFloat())
+                                .width(columnWidth * 7f)
+                                .height(1.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                        )
+                    }
+                    lessons.forEach { lesson ->
+                        val day = ChronoUnit.DAYS.between(weekStart, lesson.date).toInt()
+                        if (day !in 0..6) return@forEach
+                        val start = (lesson.startUnit - 1).coerceAtLeast(0)
+                        val span = (lesson.endUnit - lesson.startUnit + 1).coerceAtLeast(1)
+                        val isToday = lesson.date == today
+                        Box(
+                            modifier = Modifier
+                                .offset(
+                                    x = columnWidth * day.toFloat() + 2.dp,
+                                    y = rowHeight * start.toFloat() + 2.dp,
+                                )
+                                .width(columnWidth - 4.dp)
+                                .height(rowHeight * span.toFloat() - 4.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (isToday) {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    },
+                                )
+                                .clickable { onOpen(lesson) }
+                                .padding(horizontal = 6.dp, vertical = 5.dp),
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    text = lesson.courseName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = if (span >= 2) 4 else 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                // 教室一定要看得见：优先「楼 + 房间」，没有就退回地址
+                                val place = lesson.rooms.firstOrNull()
+                                    ?.let { it.display.ifBlank { it.address } }
+                                    .orEmpty()
+                                if (place.isNotEmpty()) {
+                                    Text(
+                                        text = place,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                if (span >= 2 && lesson.startTime.isNotEmpty()) {
+                                    Text(
+                                        text = lesson.startTime,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "点课程块看教师与上课时间；这一周 ${lessons.size} 次课",
-            style = MaterialTheme.typography.labelSmall,
+            text = "左右滑动看完整一周；点课程块看教师与上课时间。这一周 ${lessons.size} 次课",
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -501,30 +588,6 @@ private fun EmptyHint(text: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(16.dp),
         )
-    }
-}
-
-@Composable
-private fun PlaceholderRow(title: String, onClick: () -> Unit) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 3.dp)
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            Text(
-                "敬请期待",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 
@@ -588,6 +651,11 @@ private fun EamsLoginDialog(
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = "初始密码可能是身份证号后六位；改过密码的话用新密码。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

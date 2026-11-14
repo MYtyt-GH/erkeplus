@@ -16,11 +16,26 @@ class TimetableCache(context: Context) {
 
     private val dir = File(context.filesDir, "timetable").apply { mkdirs() }
 
+    private val semesterFile = File(dir, "semester.json")
+
     /** 读某一周的缓存；没有或损坏都返回 null。 */
     fun load(semesterId: String, weekStart: LocalDate): TimetableWeek? {
         val file = fileOf(semesterId, weekStart)
         if (!file.isFile) return null
         return runCatching { TimetableJson.decode(file.readText(Charsets.UTF_8)) }.getOrNull()
+    }
+
+    /**
+     * 上一次成功拿到的学期。离线时没有它就算不出周次，课表即便有缓存也摆不出来，
+     * 所以它和课程一起缓存（2026-11-15 补）。
+     */
+    fun loadSemester(): EamsSemester? {
+        if (!semesterFile.isFile) return null
+        return runCatching { TimetableJson.decodeSemester(semesterFile.readText(Charsets.UTF_8)) }.getOrNull()
+    }
+
+    fun saveSemester(semester: EamsSemester) {
+        runCatching { semesterFile.writeText(TimetableJson.encodeSemester(semester), Charsets.UTF_8) }
     }
 
     /** 写某一周的缓存并返回写入的时间戳（毫秒）。 */
