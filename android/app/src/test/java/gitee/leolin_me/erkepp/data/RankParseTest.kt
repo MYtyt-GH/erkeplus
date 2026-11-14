@@ -117,6 +117,32 @@ class RankParseTest {
     }
 
     @Test
+    fun `rownum 可能是小数或空串`() {
+        // 2026-11-15 实测抓到过 "rownum":39.0 —— 只认 Int 会读成 0，界面上一整页都是「—」
+        val raw = """
+            {"total":5,"pageSize":5,"pageNum":1,"list":[
+              {"rownum":39.0,"name":"a","score":1.1,"hours":44.0},
+              {"rownum":"40.0","name":"b","score":1.0,"hours":40.0},
+              {"rownum":41,"name":"c","score":0.9,"hours":36.0},
+              {"rownum":"42","name":"d","score":0.8,"hours":32.0},
+              {"rownum":"","name":"e","score":0.0,"hours":0.0}]}
+        """.trimIndent()
+        val page = parseRankPage(json.parseToJsonElement(raw), page = 1, pageSize = 5)
+        assertEquals(39, page.list[0].rownum)
+        assertEquals(40, page.list[1].rownum)
+        assertEquals(41, page.list[2].rownum)
+        assertEquals(42, page.list[3].rownum)
+        assertEquals("没有名次就是 0（界面显示「—」）", 0, page.list[4].rownum)
+    }
+
+    @Test
+    fun `rownum 缺失时退回 rank 字段`() {
+        val raw = """{"total":1,"pageSize":1,"pageNum":1,"list":[{"rank":7.0,"name":"a","score":0.1}]}"""
+        val page = parseRankPage(json.parseToJsonElement(raw), page = 1, pageSize = 1)
+        assertEquals(7, page.list.first().rownum)
+    }
+
+    @Test
     fun `score text keeps up to three decimals`() {
         assertEquals("0", rankScoreText(0.0))
         assertEquals("0.025", rankScoreText(0.025))
