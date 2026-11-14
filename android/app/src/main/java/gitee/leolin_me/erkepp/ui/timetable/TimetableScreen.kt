@@ -115,6 +115,9 @@ fun TimetableScreen(
         error = null
         try {
             val fresh = repository.weekLessons(active, current.id, start)
+            // 连着点两周时，先发的请求可能后回来。周次已经变了就丢掉这次结果，
+            // 否则会把上一周的课画到这一周的格子里（表现为「这一周 0 次课」）。
+            if (week != target) return
             val saved = cache.save(current.id, start, fresh, System.currentTimeMillis())
             lessons = fresh
             fetchedAt = saved.fetchedAt
