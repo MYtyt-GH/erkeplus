@@ -365,12 +365,35 @@ class MainActivity : ComponentActivity() {
                     attachmentFiles.firstOrNull { it.name == name }?.let { openAttachmentFile(it) }
                 }
 
+                // 调试用：`--es probe eams_probe` 验证教务客户端整条链路。
+                // 不需要二课登录，也不需要教务账号：
+                //  1) /verify-code 用固定 secret 签名，能通就证明签名/请求体/信封/错误码都对；
+                //  2) /login 用假账号，只为确认 Base64 密码与业务错误码（03000）的映射。
+                LaunchedEffect(probe) {
+                    if (!BuildConfig.DEBUG || probe != "eams_probe") return@LaunchedEffect
+                    val eams = gitee.leolin_me.erkepp.data.eams.EamsRepository()
+                    val code = runCatching { eams.verifyCode() }
+                    AppLog.d(
+                        "eams",
+                        "verify-code " + code.map { "enable=${it.enable} key=${it.key}" }
+                            .getOrElse { "ERR ${it::class.simpleName}: ${it.message}" },
+                    )
+                    val login = runCatching { eams.login("0000000000", "000000") }
+                    AppLog.d(
+                        "eams",
+                        "login(fake) " + login.map { "UNEXPECTED-SUCCESS tokenLen=${it.token.length}" }
+                            .getOrElse { "ERR ${it::class.simpleName}: ${it.message}" },
+                    )
+                }
+
                 LaunchedEffect(probe, session) {
                     if (!BuildConfig.DEBUG || probe == null) return@LaunchedEffect
                     val current = session ?: return@LaunchedEffect
                     val detailId = intent.getLongExtra("detail_id", 0L)
                     AppLog.d("probe", "start=$probe detail=$detailId")
                     when (probe) {
+                        // 已在上面单独的 LaunchedEffect 里跑完，这里只是别落进 unknown
+                        "eams_probe" -> Unit
                         "homework_list" -> activityActions.homeworkList(current.token)
                         "sign_dict" -> activityRepository.signWays(current.token)
                         "sign_records" -> activityActions.mySignRecords(current.token)
