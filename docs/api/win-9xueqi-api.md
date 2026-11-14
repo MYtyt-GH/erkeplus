@@ -219,7 +219,7 @@ POST /activity/enroll/cancel/person { id, applyInfo }               // 取消报
   "peopleLimit": 33, "joinMemberCount": 19,
   "genderLimit": 0, "gradeList": [{"name": "2025级"}],
   "collegeList": [{"name": "矿业工程学院"}], "honestLimit": null,
-  "manager": {"name": "刘昊辰", "id": 2197962},
+  "manager": {"name": "某同学", "id": 2197962},
   "activityLimitType": {"type": 0}, "attachment": [],
   "introduce": "为提高大家的学习热情……（纯文本）"
 }
@@ -518,12 +518,14 @@ score = hours × 0.025        // 我校 40 学时 = 1 学分
 
 ```json
 {"code":0,"data":{"total":39,"pageSize":2,"pageNum":1,"list":[
-  {"hours":7.0,"code":"2026306614","gender":1,"campusName":"淮南校区","className":"信计26-3",
+  {"hours":7.0,"code":"2026******","gender":1,"campusName":"淮南校区","className":"信计26-3",
    "avatar":"https://gytx-2ketang.oss-cn-hangzhou.aliyuncs.com/...jpg","rownum":1,"score":0.175,
-   "collegeName":"数学与大数据学院","grade":2026,"name":"王俊文","id":2497513,
+   "collegeName":"数学与大数据学院","grade":2026,"name":"某同学","id":2497513,
    "majorName":"信息与计算科学"}
 ]},"msg":"ok"}
 ```
+
+> 本文件里的姓名、学号一律脱敏（`某同学` / `2026******`），id 保留是因为它是接口契约的一部分。
 
 ### 成绩单页（`#/scoreReport`，2026-10-29 实测）
 
@@ -628,7 +630,7 @@ score = hours × 0.025        // 我校 40 学时 = 1 学分
 | `parentName` | 空串 | 官方「组织归属」用它，空就显示「暂无」 |
 | `affiliationName` | 安徽理工大学 | 挂靠单位 |
 | `announcementList` | `[]` | 公告；实测这两个组织都没有，非空时的元素结构未验证 |
-| `memberList` | 1052 条 | 精简成员：`{"userLastElectId":685,"name":"郑爽","id":1321746,"avatar":null}`，没有职务 |
+| `memberList` | 1052 条 | 精简成员：`{"userLastElectId":685,"name":"某同学","id":1321746,"avatar":null}`，没有职务 |
 | `joinRuleType` | 1 / 2 | 含义未验证，客户端不展示 |
 | `identity` | 1 | 我在这个组织里的身份，口径与列表一致 |
 
@@ -644,10 +646,10 @@ score = hours × 0.025        // 我校 40 学时 = 1 学分
 {"code":0,"data":{
   "managerList":[{"organizationName":"人工智能协会","nature":2,"avatar":"https://...",
     "recordId":1794697,"collegeName":"人工智能学院","electId":553,"identity":1,
-    "name":"李梦臣","duty":"会长","applyPosition":1,"id":1376788,"majorName":"机器人工程",
+    "name":"某同学","duty":"会长","applyPosition":1,"id":1376788,"majorName":"机器人工程",
     "department":""}],
   "waitAuditMembers":113,"chairman":null,
-  "commonList":[{"name":"马志强","recordId":1794705,"collegeName":"人工智能学院",
+  "commonList":[{"name":"某同学","recordId":1794705,"collegeName":"人工智能学院",
     "electId":553,"identity":1,"duty":"","applyPosition":null,"id":1682122,"majorName":"人工智能"}]}}
 ```
 
@@ -821,7 +823,7 @@ score = hours × 0.025        // 我校 40 学时 = 1 学分
   "organizationName":"","avatar":"https://.../1784864580174.jpeg",
   "dynamicCount":0,"organizationCount":3,"activityCount":32,
   "collegeName":"化工与爆破学院","isFollow":0,"identity":1,"schoolId":10361,
-  "name":"程子涛","id":1908337,"majorName":"弹药工程与爆炸技术",
+  "name":"某同学","id":1908337,"majorName":"弹药工程与爆炸技术",
   "personTag":[{"name":"电竞·游戏","id":2},{"name":"电影","id":3}]}}
 ```
 
@@ -832,9 +834,149 @@ score = hours × 0.025        // 我校 40 学时 = 1 学分
 - `hours` 是**学时**，官方页面没摆出来，客户端也不摆（见 `docs/design/person.md`）
 - 组织账号的 `identity=2` 只在模板里出现，实测样本是学生，未验证
 
+## 我的消息（阅办 `#/needDealt`，2026-11-15 实测）
+
+官方页面顶部两个 tab：**待办** 与 **消息**；底部导航「阅办」上的红点用的是消息未读数。
+本节结论全部来自登录会话内的只读请求（`pageSize` 各档位、分页边界都跑过），写操作只读源码、未执行。
+
+### 读
+
+| 端点 | 参数 | 返回 |
+| --- | --- | --- |
+| `GET /message/notice/list` | `{"pageNum":1,"pageSize":10}` | `{total, pageNum, pageSize, list[]}` |
+| `GET /message/notice/un-read-count` | `{}` | `{unReadCount: 10}`（**整数**） |
+| `GET /activity/processing/statistics` | `{}` | 18 个待办计数（见下） |
+| `GET /activity/processing/list` | `{}` | 数组；学生账号为空 `[]` |
+| `GET /dynamic/unread/count` | `{}` | `{unReadCount: "0"}`（**字符串**，与上面那个不同） |
+
+分页实测（total=27 的账号，`pageSize=10`）：
+
+| pageNum | 返回条数 | 说明 |
+| --- | --- | --- |
+| 1 | 10 | 按 `ctime` 倒序，第一条是最新的 |
+| 3 | 7 | 正好把 27 条取完 |
+| 4 | 0 | 空数组 |
+
+- **响应里没有 `lastPage` 字段**，只有 `total` / `pageNum` / `pageSize` / `list`。
+  官方 H5 读 `data.lastPage` 判断「没有更多」，拿不到就只有一直翻到空列表为止
+  （`static/js/5.*.js` 里 `a.lastPage?disablePullup():enablePullup()`）。
+  客户端要自己算 `pageNum * pageSize >= total`。
+- `pageSize` 必填：不传或传 `{}` 直接返回 `code:10002`、`msg:"参数错误!"`。
+- 分页连续、无重复、无重叠（1/2/3 页的 id 区间互不相交）。
+
+### 列表项字段（27 条真实样本，字段全部非空）
+
+```json
+{"id":101958027,"type":2,"typeName":"活动通知","subType":6,"subTypeName":"学时已发放",
+ "content":"恭喜你参加的…5.0学时已发放","isRead":0,"ctime":1794456345000,
+ "icon":"","showDelete":"false","extras":{"managerId":1341266,"jumpInfo":565487}}
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `id` | 消息 id，标记已读用 |
+| `type` / `typeName` | 2 活动通知、3 组织通知、4 申报、162 黑名单…；`typeName` 直接用，不要自己写死 |
+| `subType` / `subTypeName` | 细分类；`subTypeName` 就是现成短标题（学时已发放 / 开始签到、签退 / 个人报名审核通过…） |
+| `content` | 一句正文 |
+| `isRead` | 0 未读、1 已读 |
+| `ctime` | 毫秒时间戳，列表按它倒序 |
+| `extras.jumpInfo` | 落点 id：`type=2` 是活动 id，`type=3` 是组织 id |
+| `extras.managerId` | 操作人 id；**等于当前 `userId` 时官方跳「管理员视角」的活动页** |
+| `icon` | 样本全为空串，未见到有用值 |
+| `showDelete` | **字符串** `"false"`，语义未验证（推测控制能否单条删除） |
+
+实测见过的 `type/subType` 组合：`2/6` 学时已发放、`2/12` 开始签到签退、`2/17` 报名审核通过、
+`2/24` 报名审核被驳回、`3/13` 成功加入组织、`162/163` 黑名单解除审核通过。
+`unReadCount` 与列表里 `isRead==0` 的条数一致（10 对 10）。
+
+### 待办的 18 个计数（学生账号实测全为 0）
+
+```
+waitingSignCount                待签到
+waitingSubmitWorkCount          待提交作业
+waitingAuditActivityCount       待审核活动
+waitingReportCount              待提交报告
+waitAuditOrgCount               待审核组织
+projectAuditCount               待审核项目
+activityAuditCount              待审核活动（管理）
+waitAuditHoursSwapCount         待审核学时兑换
+waitYearAuditOrgCount           待审核组织年审
+waitRegisterAuditOrgCount       待审核组织注册
+waitAppraisingAuditOrgCount     待审核组织评定
+waitAppraisingAuditOrgMemCount  待审核组织评定成员
+waitAuditOrgQuitApplyCount      待审核退组织申请
+waitElectAuditOrgCount          待审核换届
+waitCreateAuditOrgCount         待审核创建组织
+waitCancelAuditOrgCount         待审核注销组织
+waitingLeaveCount               待审核请假
+waitingAuditCcMembers           待审核抄送成员
+```
+
+官方把**这些字段求和**作为待办角标，`>99` 显示 `99+`；全部为 0 时不显示。
+名字的含义是照字段名推的，**未逐个实测**——普通学生基本恒为 0，这些计数是给管理员/审核人用的。
+
+### 待办 tab 长什么样（H5 源码，2026-11-15）
+
+页面顶部有三个 tab，第三个只在组织账号（`identity=2`）出现：
+
+| tab | 数据源 | 说明 |
+| --- | --- | --- |
+| 待办 | `activity/processing/list` | 行 = 图标 + `workDes` + `count` 角标 |
+| 已办 | `GET /activity/activity/listByTeacher`（仅 `identity=2`） | 参数 `current`、`size`、`activityType`、`status`、`startTime`、`endTime` |
+| 消息 | `message/notice/list` | 见上 |
+
+待办行的字段（`activity/processing/list` 的数组元素）：
+
+```json
+{"icon": "https://...", "workDes": "活动审核", "count": 3, "route": "/activityAudit/xxx"}
+```
+
+- **`route` 由服务端给**，官方就是 `this.$router.push({path: e.route})`——不猜路由。
+- `count` 是这一项的待办条数，官方用它渲染行尾角标（`<10` 时宽度收窄到 12px）。
+- 空列表时官方显示「暂无待办内容~」。
+- 学生账号实测 `[]`，上面四个字段**只有名字是源码里看到的，真实取值一个都没见过**。
+
+### 官方 H5 自己的两个 bug（读源码时顺手发现，记录以免被照抄）
+
+1. `getMessageCount2`（广场未读）里，超过 99 时写的是 `t.unReadCount = "99+"`，
+   本该写 `unReadSquareCount`——复制粘贴串了。结果是广场未读过 99 会把**消息**角标改坏。
+2. `data.lastPage` 全站都没有这个字段，H5 拿它判断「没有更多」永远拿到 `undefined`，
+   只能靠一直翻到空列表。客户端不要照抄。
+
+### 写（源码核对，未执行）
+
+| 动作 | 请求 | 触发方式 |
+| --- | --- | --- |
+| 单条已读 | `POST /message/notice/read`　`{id: <消息 id>}` | 点开一条 `isRead==0` 的消息时自动发，成功后重拉列表 |
+| 全部已读 | `POST /message/notice/read-all`　`{id: 0}` | 点「N 条未读通知」那颗按钮（模板里就是 `readNotice(0)`） |
+| 清空全部 | `POST /message/notice/clean`　`{id: null}` | 列表右上角垃圾桶，弹「确定清空所有通知吗？」 |
+| 单条删除 | `POST /message/notice/clean`　`{id: <消息 id>}` | 同上接口带 id；**不是** `message/delete` |
+
+- 删除与清空**共用 `message/notice/clean`**，靠 `id` 是否为空区分；此前文档里提到的
+  `message/delete` 只出现在别的页面（`static/js/131.*.js` 里是 `/messages`），不要混用。
+- 这几个都是写操作，按项目红线**未实测**；接入前必须真机提一次并记录返回结构。
+
+### 点一条消息落到哪（H5 源码的分支表）
+
+官方是一个超长的 `type` / `subType` 分支。与我们已有页面相关的只有三条：
+
+| 条件 | 官方落点 | 我方现状 |
+| --- | --- | --- |
+| `type=2` 且 `managerId != 我` 且 subType ∉ {178,179 请假, 177 审核请假, 34 消息类型} | 活动详情（只读） | 有（`ActivityDetailScreen`） |
+| `type=3`，subType ∈ {13 加入组织, 19} | `/myApplyorg`（我申请的组织） | 有（「我的组织」页） |
+| `type=3`，其它 subType | `/orgDetail/{jumpInfo}` | 有（`OrgDetailScreen`） |
+| `type=2` 且 `managerId == 我` | 管理员视角活动页 | 无 |
+| `type=162` 黑名单通知 | **不跳转**，只标记已读 | 无需跳转 |
+| 其余 type（4/22/28/31/36/43/48/52/55/58/61/64/68/70/73/76/87/91/100/105/108/111/131/133/135…） | 各自的管理/申报页 | 无，回退到「打开官方页面」 |
+
 ## 尚未验证
 
 - 报名、取消、签到等**写操作**（未验证，禁止先行接入）
+- 我的消息的三个写接口（`notice/read`、`notice/read-all`、`notice/clean`）：参数来自源码，
+  实际返回与副作用未测
+- 待办 18 个计数的真实触发条件（学生账号全为 0，管理员视角未测）
+- `activity/processing/list` 的元素真实取值（`icon` / `workDes` / `count` / `route` 只有字段名可信）
+- 已办 tab 的 `activity/activity/listByTeacher` 响应结构（仅组织账号可见，无样本）
 - 已参加（`detail/participant`）与管理员（`detail/manger`）两个详情接口的实际响应
 - 二课成绩页（`#/scoreReport`）实际接口
 - 学生组织、问卷、打卡等长尾页面
