@@ -164,7 +164,7 @@ fun ProfileScreen(
                     )
                     EntryRow(
                         title = "我的课表",
-                        subtitle = "教务系统的课表，正在接入，敬请期待",
+                        subtitle = "教务系统的课表，按周看；首次要点一下登录",
                         onClick = onOpenTimetable,
                         showDivider = false,
                     )

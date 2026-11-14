@@ -220,6 +220,10 @@ class MainActivity : ComponentActivity() {
         val userRepository = UserRepository(apiClient)
         val storageRepository = StorageRepository()
         val ossUploader = OssUploader(apiClient)
+        // 教务（课表）走另一套协议与另一套凭据，见 docs/api/eams-jwglyd.md
+        val eamsRepository = gitee.leolin_me.erkepp.data.eams.EamsRepository()
+        val eamsSessionStore = gitee.leolin_me.erkepp.data.eams.EamsSessionStore(this)
+        val timetableCache = gitee.leolin_me.erkepp.data.eams.TimetableCache(this)
         Startup.mark("repositories")
 
         setContent {
@@ -254,6 +258,8 @@ class MainActivity : ComponentActivity() {
                 var settingsSection by remember { mutableStateOf(SettingsSection.ROOT) }
                 var showCredit by remember { mutableStateOf(false) }
                 var showRank by remember { mutableStateOf(false) }
+                // 「我的课表」覆盖层（教务课表，独立的一套登录与缓存）
+                var showTimetable by remember { mutableStateOf(false) }
                 // 调试用：`--es probe rank_page --es level 6` 直接开指定范围的榜单
                 var rankLevel by remember { mutableIntStateOf(10) }
                 var showPersonalInfo by remember { mutableStateOf(false) }
@@ -941,13 +947,7 @@ class MainActivity : ComponentActivity() {
                                             onOpenRank = { showRank = true },
                                             onOpenOrganizations = { showOrganizations = true },
                                             onOpenAttachments = { attachmentsVisible = true },
-                                            onOpenTimetable = {
-                                                Toast.makeText(
-                                                    activity,
-                                                    "我的课表还在接入，敬请期待",
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
-                                            },
+                                            onOpenTimetable = { showTimetable = true },
                                         )
 
                                         MainTab.MORE -> MoreScreen(
@@ -1238,6 +1238,17 @@ class MainActivity : ComponentActivity() {
                                         initialScope = RankScope.of(rankLevel),
                                         onOpenPerson = { id -> userPageTarget = id },
                                         onBack = { showRank = false },
+                                    )
+                                }
+                            }
+
+                            if (showTimetable) {
+                                SecondaryPage(onBack = { showTimetable = false }) {
+                                    gitee.leolin_me.erkepp.ui.timetable.TimetableScreen(
+                                        repository = eamsRepository,
+                                        sessionStore = eamsSessionStore,
+                                        cache = timetableCache,
+                                        onBack = { showTimetable = false },
                                     )
                                 }
                             }
