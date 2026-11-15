@@ -602,6 +602,9 @@ class MainActivity : ComponentActivity() {
                             rankLevel = intent.getStringExtra("level")?.toIntOrNull() ?: 10
                             showRank = true
                         }
+                        // 调试用：`--es probe timetable` 直接打开「我的课表」，
+                        // 换分辨率 / 字号走查布局时不用去点底部导航
+                        "timetable" -> showTimetable = true
                         "rank_all" -> rankRepository.dumpAll(
                             token = current.token,
                             scope = RankScope.of(intent.getStringExtra("level")?.toIntOrNull() ?: 10),

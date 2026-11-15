@@ -27,25 +27,25 @@ class TimetableMetricsTest {
         // 360x780 是主流尺寸；高度足够，12 节应该一屏放下
         val m = metrics(360f, 700f)
         assertEquals(TimetableMode.FULL, m.mode)
-        assertEquals(96f, m.columnWidthDp, 0.01f)
+        assertEquals(88f, m.columnWidthDp, 0.01f)
         assertTrue("窄屏一屏看不到 7 天，应该能横滑", m.visibleDays < 7f)
-        assertTrue("列宽不能小于 96dp，否则课程名挤成一列字", m.columnWidthDp >= 96f)
+        assertTrue("列宽不能小于 88dp，否则课程名挤成一列字", m.columnWidthDp >= 88f)
     }
 
     @Test
     fun `小屏 320dp 宽`() {
         val m = metrics(320f, 600f)
-        assertEquals(96f, m.columnWidthDp, 0.01f)
-        assertTrue(m.visibleDays > 3f)
+        assertEquals(88f, m.columnWidthDp, 0.01f)
+        assertTrue("320dp 屏至少能看到 3 天", m.visibleDays > 3f)
         assertTrue(m.mode == TimetableMode.FULL || m.mode == TimetableMode.DENSE)
     }
 
     @Test
     fun `宽屏与平板 七天一次看全`() {
-        // 800dp 宽：800/7 = 114dp，在 96..168 之间，7 天正好铺满
+        // 800dp 宽：扣掉 58dp 节次栏还剩 742dp，除以 7 = 106dp，正好铺满 7 天
         val m = metrics(800f, 1100f)
         assertEquals(7f, m.visibleDays, 0.01f)
-        assertEquals(800f / 7f, m.columnWidthDp, 0.01f)
+        assertEquals((800f - 58f) / 7f, m.columnWidthDp, 0.01f)
         assertEquals(TimetableMode.FULL, m.mode)
     }
 

@@ -29,6 +29,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -46,6 +47,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import gitee.leolin_me.erkepp.data.eams.EamsException
@@ -92,7 +94,12 @@ fun TimetableScreen(
     var semester by remember { mutableStateOf(cache.loadSemester()) }
     var semestersLoaded by remember { mutableStateOf(false) }
     var maxUnit by remember { mutableIntStateOf(DEFAULT_UNIT) }
-    var week by remember { mutableIntStateOf(0) }
+    // 今天与周次在**组合时**就算好，不等 LaunchedEffect：
+    // 否则会有一帧 week=0，界面按「第 1 周」把开学那周画出来，看着像「这周没有课」
+    val today = remember { LocalDate.now() }
+    var week by remember {
+        mutableIntStateOf(semester?.let { SemesterCalendar.weekOf(it, today) } ?: 0)
+    }
     var lessons by remember { mutableStateOf<List<EamsLesson>>(emptyList()) }
     var fetchedAt by remember { mutableLongStateOf(0L) }
     var loading by remember { mutableStateOf(false) }
@@ -101,7 +108,6 @@ fun TimetableScreen(
     var loginError by remember { mutableStateOf<String?>(null) }
     var detail by remember { mutableStateOf<EamsLesson?>(null) }
 
-    val today = remember { LocalDate.now() }
     val currentWeek = semester?.let { SemesterCalendar.weekOf(it, today) } ?: 0
 
     fun applyCache(current: EamsSemester, target: Int) {
@@ -211,16 +217,26 @@ fun TimetableScreen(
         }
     }
 
-    // 整页不上下滚动：上半是固定的信息区，下半由课表占满，只有课表可以左右滑
-    Column(modifier = Modifier.fillMaxSize()) {
-        Header(
-            semester = semester,
-            week = week,
-            fetchedAt = fetchedAt,
-            loading = loading,
-            onBack = onBack,
-            onUpdate = { refreshNow() },
-        )
+    // 这一页是 7 列 × 12 行的密排表格，系统字号放到 1.5、2.0 时再跟着放大会把表格挤没。
+    // 这里把字号上限压到 1.3 倍，其余页面仍然完全跟随系统设置（2026-11-15 真机在 2.0 下验证过：
+    // 不压的话标题就把半屏吃完，课表只剩一行）。压到 1.3 后仍能靠竖向滚动照顾大字用户。
+    val systemDensity = LocalDensity.current
+    CompositionLocalProvider(
+        LocalDensity provides Density(
+            density = systemDensity.density,
+            fontScale = systemDensity.fontScale.coerceAtMost(MAX_FONT_SCALE),
+        ),
+    ) {
+        // 整页不上下滚动：上半是固定的信息区，下半由课表占满，只有课表可以左右滑
+        Column(modifier = Modifier.fillMaxSize()) {
+            Header(
+                semester = semester,
+                week = week,
+                fetchedAt = fetchedAt,
+                loading = loading,
+                onBack = onBack,
+                onUpdate = { refreshNow() },
+            )
 
         val shownSemester = semester
         if (shownSemester != null && week > 0) {
@@ -280,13 +296,15 @@ fun TimetableScreen(
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = if (lessons.isEmpty() && !loading) "这一周没有课" else "左右滑动看整周 · 点课程看教师与教室",
+                text = if (lessons.isEmpty() && !loading) "这一周没有课" else "左右滑动看整周 · 点课程看详情",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
             if (sessionStore.remembered()) {
@@ -297,8 +315,9 @@ fun TimetableScreen(
                         semestersLoaded = false
                         error = null
                     },
-                ) { Text("退出教务登录", style = MaterialTheme.typography.labelSmall) }
+                ) { Text("退出教务登录", style = MaterialTheme.typography.labelSmall, maxLines = 1) }
             }
+        }
         }
     }
 
@@ -353,7 +372,7 @@ private fun Header(
             }
             TextButton(onClick = onUpdate) { Text("更新") }
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = buildString {
                     if (week > 0) append("第 $week 周")
@@ -364,13 +383,16 @@ private fun Header(
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.weight(1f))
             if (fetchedAt > 0) {
                 Text(
                     text = "更新于 ${formatTime(fetchedAt)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -472,7 +494,7 @@ private fun TimetableGrid(
         val rowHeight = metrics.rowHeightDp.dp
         val dense = metrics.dense
         val scrollVertically = metrics.mode == TimetableMode.SCROLL
-        val ultraDense = rowHeight < 30.dp
+        val ultraDense = rowHeight < 26.dp
 
         val table: @Composable () -> Unit = {
             Row(modifier = Modifier.fillMaxWidth()) {
@@ -826,5 +848,8 @@ private fun formatTime(millis: Long): String =
 
 private const val DEFAULT_UNIT = 12
 private const val MIN_UNIT = 8
+
+/** 课表页字号缩放上限：超过这个值表格就摆不下了（见 TimetableScreen 里的说明）。 */
+private const val MAX_FONT_SCALE = 1.3f
 private val WEEK_LABELS = listOf("一", "二", "三", "四", "五", "六", "日")
 private val MONTH_DAY = DateTimeFormatter.ofPattern("MM-dd", Locale.US)

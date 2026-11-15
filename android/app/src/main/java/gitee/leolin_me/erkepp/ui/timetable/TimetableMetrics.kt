@@ -43,7 +43,7 @@ object TimetableLayout {
     /** 表头高度，和 TimetableGrid 里的数值保持一致。 */
     const val HEADER_DP = 24f
 
-    private const val MIN_COLUMN_DP = 96f
+    private const val MIN_COLUMN_DP = 88f
     private const val MAX_COLUMN_DP = 168f
     private const val MIN_GUTTER_DP = 44f
     private const val MAX_GUTTER_DP = 58f
@@ -62,8 +62,10 @@ object TimetableLayout {
     ): TimetableMetrics {
         val safeFontScale = fontScale.coerceIn(0.5f, 3f)
         val units = maxUnit.coerceAtLeast(1)
-        val column = (availableWidthDp / 7f).coerceIn(MIN_COLUMN_DP, MAX_COLUMN_DP)
         val gutter = (availableWidthDp * 0.13f).coerceIn(MIN_GUTTER_DP, MAX_GUTTER_DP)
+        // 列宽按**扣掉节次栏之后**的宽度算，否则宽屏上第 7 天会被切掉一条
+        val gridWidth = (availableWidthDp - gutter).coerceAtLeast(1f)
+        val column = (gridWidth / 7f).coerceIn(MIN_COLUMN_DP, MAX_COLUMN_DP)
         val naturalRow = ((availableHeightDp - HEADER_DP) / units).coerceAtLeast(1f)
         val fullRow = FULL_ROW_DP * safeFontScale
         val denseRow = DENSE_ROW_DP * safeFontScale
@@ -79,7 +81,7 @@ object TimetableLayout {
             gutterWidthDp = gutter,
             rowHeightDp = rowHeight,
             mode = mode,
-            visibleDays = availableWidthDp / column,
+            visibleDays = gridWidth / column,
         )
     }
 }
