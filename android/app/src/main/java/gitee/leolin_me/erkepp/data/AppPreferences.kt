@@ -212,6 +212,20 @@ class AppPreferences(context: Context) {
         }
     }
 
+    // ---- 桌面小组件外观（「更多 → 桌面小组件」里调） ----
+
+    /** 背景色：空串 = 跟随主题；否则 `#RRGGBB` / `#AARRGGBB`。 */
+    var widgetBackgroundColor: String by prefString(KEY_WIDGET_BG, "")
+
+    /** 背景透明度 0..100，100 = 不透明（桌面壁纸透不过来）。 */
+    var widgetBackgroundAlpha: Int by prefInt(KEY_WIDGET_ALPHA, 100)
+
+    /** 文字颜色：空串 = 跟随主题；否则 `#RRGGBB`。 */
+    var widgetTextColor: String by prefString(KEY_WIDGET_TEXT, "")
+
+    /** 文字大小百分比：90 / 100 / 115。 */
+    var widgetTextScale: Int by prefInt(KEY_WIDGET_TEXT_SCALE, 100)
+
     private companion object {
         const val KEY_DISCLAIMER = "disclaimer_accepted_v1"
         const val KEY_CATEGORIES_ENABLED = "categories_enabled"
@@ -241,6 +255,10 @@ class AppPreferences(context: Context) {
         const val KEY_LOAD_STATUSES = "load_statuses"
         const val KEY_PROFILE_UPDATED_AT = "profile_updated_at"
         const val KEY_STORAGE_SELECTION = "storage_selection"
+        const val KEY_WIDGET_BG = "widget_bg_color"
+        const val KEY_WIDGET_ALPHA = "widget_bg_alpha"
+        const val KEY_WIDGET_TEXT = "widget_text_color"
+        const val KEY_WIDGET_TEXT_SCALE = "widget_text_scale"
 
         val DEFAULT_CATEGORIES = setOf(1440, 1441, 1444)
 

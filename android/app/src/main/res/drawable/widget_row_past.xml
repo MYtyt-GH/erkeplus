@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 已经上完的那一行：中性淡底，不抢正在上/接下来的课 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/widget_row_past" />
+    <corners android:radius="8dp" />
+</shape>

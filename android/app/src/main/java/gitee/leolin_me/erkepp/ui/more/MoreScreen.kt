@@ -39,6 +39,7 @@ fun MoreScreen(
     onJoinOrganization: () -> Unit,
     onOpenRank: () -> Unit,
     onOpenStorage: () -> Unit,
+    onOpenWidgets: () -> Unit,
     onOpenWeb: () -> Unit,
     onComingSoon: (String) -> Unit,
 ) {
@@ -109,6 +110,22 @@ fun MoreScreen(
                     title = "加入组织",
                     subtitle = "扫组织码，直接进那个组织的详情",
                     onClick = onJoinOrganization,
+                    showDivider = false,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(18.dp))
+        SectionLabel("桌面")
+        Spacer(Modifier.height(8.dp))
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column {
+                // 国产 ROM 把「添加小部件」入口藏得很深，用户经常找不到；
+                // 这里提供一个应用内的入口：先替用户调起系统固定，不行再给出手动路径
+                EntryRow(
+                    title = "桌面小组件",
+                    subtitle = "课表放桌面；背景色、透明度、文字颜色与字号都能自己调",
+                    onClick = onOpenWidgets,
                     showDivider = false,
                 )
             }

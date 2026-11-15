@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- 只在 debug 包里：按任意尺寸预览桌面小组件（详见 WidgetPreviewActivity 的注释） -->
+        <activity
+            android:name=".debug.WidgetPreviewActivity"
+            android:exported="true"
+            android:label="小组件预览" />
+    </application>
+</manifest>

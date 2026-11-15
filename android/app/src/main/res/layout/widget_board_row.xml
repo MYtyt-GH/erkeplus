@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    课程看板的一行：圆点 + 时间 + 课名（大字）+ 教室。
+    「一列课表、一列教室」：课名放在中间拿最大宽度，教室靠右对齐成第二列，
+    窄档位（< 200dp）藏掉教室那一列。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/row_root"
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:orientation="horizontal"
+    android:paddingStart="2dp"
+    android:paddingTop="2dp"
+    android:paddingEnd="2dp"
+    android:paddingBottom="2dp">
+
+    <!-- ImageView 而不是 View：RemoteViews 只允许白名单里的系统控件 -->
+    <ImageView
+        android:id="@+id/row_dot"
+        android:layout_width="6dp"
+        android:layout_height="6dp"
+        android:layout_gravity="center_vertical"
+        android:background="@drawable/widget_dot_1"
+        android:contentDescription="@null" />
+
+    <TextView
+        android:id="@+id/row_time"
+        android:layout_width="46dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_marginStart="6dp"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:textColor="@color/widget_text_secondary"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/row_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_marginStart="4dp"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif-medium"
+        android:maxEms="4"
+        android:maxLines="2"
+        android:textColor="@color/widget_text"
+        android:textSize="17sp" />
+
+    <TextView
+        android:id="@+id/row_room"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_marginStart="6dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:gravity="end"
+        android:maxLines="1"
+        android:textColor="@color/widget_text_secondary"
+        android:textSize="12sp" />
+</LinearLayout>

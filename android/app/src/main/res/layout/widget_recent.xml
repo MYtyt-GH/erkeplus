@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    最近两节课：标题一行（「接下来」或「正在上」），下面是两节课的大字时间轴。
+    示例行只用于预览，真正的内容由 RecentWidgetProvider 整块替换。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- 背景：运行时按用户选的颜色/透明度画一张圆角位图 -->
+    <ImageView
+        android:id="@+id/widget_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_background_card" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <TextView
+            android:id="@+id/recent_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/widget_accent"
+            android:textSize="11sp"
+            android:text="接下来" />
+
+        <LinearLayout
+            android:id="@+id/recent_rows"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="vertical">
+
+            <include layout="@layout/widget_course_row_large" />
+
+            <include layout="@layout/widget_course_row_large" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/recent_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="13sp"
+            android:visibility="gone"
+            android:text="接下来没有课" />
+    </LinearLayout>
+</FrameLayout>

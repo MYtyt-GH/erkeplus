@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    时间轴上的一行：圆点 + 起课时间 + 课名/教室。
+    三种小组件共用这个结构，只有字号不同（本文件是课程看板的小号字）。
+    圆点颜色按课名稳定取，与课表页的课程块同一套（ui/CourseColor.kt）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/row_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="2dp"
+    android:orientation="horizontal"
+    android:paddingStart="2dp"
+    android:paddingTop="3dp"
+    android:paddingEnd="2dp"
+    android:paddingBottom="3dp">
+
+    <!-- ImageView 而不是 View：RemoteViews 只允许白名单里的系统控件，裸 View 会 inflate 失败 -->
+    <ImageView
+        android:id="@+id/row_dot"
+        android:layout_width="8dp"
+        android:layout_height="8dp"
+        android:layout_gravity="top"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/widget_dot_1"
+        android:contentDescription="@null" />
+
+    <TextView
+        android:id="@+id/row_start"
+        android:layout_width="44dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="2"
+        android:textColor="@color/widget_text_secondary"
+        android:textSize="12sp" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/row_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:textColor="@color/widget_text"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/row_room"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="11sp" />
+    </LinearLayout>
+</LinearLayout>

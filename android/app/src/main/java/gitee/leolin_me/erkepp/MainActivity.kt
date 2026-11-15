@@ -96,6 +96,7 @@ import gitee.leolin_me.erkepp.ui.home.ProfileScreen
 import gitee.leolin_me.erkepp.ui.login.ForgotPasswordScreen
 import gitee.leolin_me.erkepp.ui.login.LoginScreen
 import gitee.leolin_me.erkepp.ui.more.MoreScreen
+import gitee.leolin_me.erkepp.ui.more.WidgetScreen
 import gitee.leolin_me.erkepp.ui.org.AllOrganizationsScreen
 import gitee.leolin_me.erkepp.ui.org.OrgDetailScreen
 import gitee.leolin_me.erkepp.ui.org.OrganizationScreen
@@ -117,6 +118,7 @@ import gitee.leolin_me.erkepp.ui.settings.SettingsSection
 import gitee.leolin_me.erkepp.ui.sign.SignScanScreen
 import gitee.leolin_me.erkepp.ui.sign.SignTarget
 import gitee.leolin_me.erkepp.ui.sign.decodeQrFromBitmap
+import gitee.leolin_me.erkepp.ui.widget.WidgetIntents
 import gitee.leolin_me.erkepp.data.parseSignCode
 import gitee.leolin_me.erkepp.data.SignOutcome
 import gitee.leolin_me.erkepp.data.SignTicket
@@ -227,6 +229,7 @@ class MainActivity : ComponentActivity() {
         val eamsRepository = gitee.leolin_me.erkepp.data.eams.EamsRepository()
         val eamsSessionStore = gitee.leolin_me.erkepp.data.eams.EamsSessionStore(this)
         val timetableCache = gitee.leolin_me.erkepp.data.eams.TimetableCache(this)
+        val courseAliases = gitee.leolin_me.erkepp.data.eams.CourseAliases(this)
         val updateChecker = UpdateChecker()
         Startup.mark("repositories")
 
@@ -293,8 +296,14 @@ class MainActivity : ComponentActivity() {
                 var settingsSection by remember { mutableStateOf(SettingsSection.ROOT) }
                 var showCredit by remember { mutableStateOf(false) }
                 var showRank by remember { mutableStateOf(false) }
-                // 「我的课表」覆盖层（教务课表，独立的一套登录与缓存）
-                var showTimetable by remember { mutableStateOf(false) }
+                // 「我的课表」覆盖层（教务课表，独立的一套登录与缓存）。
+                // 桌面小组件点进来时 intent 里带 open=timetable，直接铺开这一页；
+                // 从课表页返回落在主界面（发现页）——应用本来就在这一页，不用额外写代码。
+                var showTimetable by remember {
+                    mutableStateOf(
+                        intent.getStringExtra(WidgetIntents.EXTRA_OPEN) == WidgetIntents.OPEN_TIMETABLE,
+                    )
+                }
                 // 调试用：`--es probe rank_page --es level 6` 直接开指定范围的榜单
                 var rankLevel by remember { mutableIntStateOf(10) }
                 var showPersonalInfo by remember { mutableStateOf(false) }
@@ -302,6 +311,8 @@ class MainActivity : ComponentActivity() {
                 var showChangeMobile by remember { mutableStateOf(false) }
                 var showTags by remember { mutableStateOf(false) }
                 var showStorage by remember { mutableStateOf(false) }
+                // 「更多 → 桌面小组件」：外观调节 + 添加到桌面
+                var showWidgets by remember { mutableStateOf(false) }
                 // 「更多」里的组织：所有组织目录、只认组织码的扫码页
                 // 试点：覆盖层可见性收进 MainUiState，其余 showXxx 后续逐个迁
                 var uiState by remember { mutableStateOf(MainUiState()) }
@@ -1003,6 +1014,7 @@ class MainActivity : ComponentActivity() {
                                             onJoinOrganization = { showJoinScan = true },
                                             onOpenRank = { showRank = true },
                                             onOpenStorage = { showStorage = true },
+                                            onOpenWidgets = { showWidgets = true },
                                             onOpenWeb = { webUrl = AppConfig.HOME_URL },
                                             onComingSoon = { name ->
                                                 Toast.makeText(activity, "$name 还没做，敬请期待", Toast.LENGTH_SHORT).show()
@@ -1300,6 +1312,7 @@ class MainActivity : ComponentActivity() {
                                         repository = eamsRepository,
                                         sessionStore = eamsSessionStore,
                                         cache = timetableCache,
+                                        aliasStore = courseAliases,
                                         onBack = { showTimetable = false },
                                     )
                                 }
@@ -1662,6 +1675,16 @@ class MainActivity : ComponentActivity() {
                                         repository = storageRepository,
                                         preferences = preferences,
                                         onBack = { showStorage = false },
+                                    )
+                                }
+                            }
+
+                            // 桌面小组件：外观自己调 + 添加到桌面（国产 ROM 的添加入口太深）
+                            if (showWidgets) {
+                                SecondaryPage(onBack = { showWidgets = false }) {
+                                    WidgetScreen(
+                                        preferences = preferences,
+                                        onBack = { showWidgets = false },
                                     )
                                 }
                             }

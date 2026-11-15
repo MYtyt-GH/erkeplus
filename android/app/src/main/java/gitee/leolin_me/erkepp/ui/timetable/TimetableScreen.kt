@@ -1,6 +1,7 @@
 package gitee.leolin_me.erkepp.ui.timetable
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.KeyboardType
@@ -50,15 +52,20 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import gitee.leolin_me.erkepp.data.eams.CourseAliases
 import gitee.leolin_me.erkepp.data.eams.EamsException
 import gitee.leolin_me.erkepp.data.eams.EamsLesson
 import gitee.leolin_me.erkepp.data.eams.EamsRepository
+import gitee.leolin_me.erkepp.data.eams.EamsRoom
 import gitee.leolin_me.erkepp.data.eams.EamsSemester
 import gitee.leolin_me.erkepp.data.eams.EamsSession
 import gitee.leolin_me.erkepp.data.eams.EamsSessionStore
 import gitee.leolin_me.erkepp.data.eams.SemesterCalendar
 import gitee.leolin_me.erkepp.data.eams.TimetableCache
+import gitee.leolin_me.erkepp.data.eams.displayName
 import gitee.leolin_me.erkepp.data.eams.on
+import gitee.leolin_me.erkepp.ui.CourseColor
+import gitee.leolin_me.erkepp.ui.widget.WidgetRefresh
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -86,9 +93,11 @@ fun TimetableScreen(
     repository: EamsRepository,
     sessionStore: EamsSessionStore,
     cache: TimetableCache,
+    aliasStore: CourseAliases,
     onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     var session by remember { mutableStateOf(sessionStore.load()) }
     var semester by remember { mutableStateOf(cache.loadSemester()) }
@@ -107,6 +116,9 @@ fun TimetableScreen(
     var showLogin by remember { mutableStateOf(false) }
     var loginError by remember { mutableStateOf<String?>(null) }
     var detail by remember { mutableStateOf<EamsLesson?>(null) }
+    // 课程别名：展示时优先用别名（见 CourseAliases），改完立刻推一次桌面小组件
+    var aliases by remember { mutableStateOf(aliasStore.all()) }
+    var renaming by remember { mutableStateOf<EamsLesson?>(null) }
 
     val currentWeek = semester?.let { SemesterCalendar.weekOf(it, today) } ?: 0
 
@@ -129,6 +141,8 @@ fun TimetableScreen(
             val saved = cache.save(current.id, start, fresh, System.currentTimeMillis())
             lessons = fresh
             fetchedAt = saved.fetchedAt
+            // 桌面小组件只读缓存，所以缓存一变就推一次（三种组件都读课表）
+            WidgetRefresh.timetable(context)
         } catch (failure: Throwable) {
             if (failure is EamsException && failure.tokenInvalid) {
                 sessionStore.clear()
@@ -143,6 +157,24 @@ fun TimetableScreen(
         }
     }
 
+    /**
+     * 顺带把下一周也拉下来存好。
+     *
+     * 桌面小组件只读缓存：周日没打开应用，周一早上桌面就是「这周的课表还没下载」。
+     * 每周多一个请求就换来周一不空窗，值得。失败静默——它只是保险，不该打扰用户。
+     */
+    suspend fun prefetchNextWeek(active: EamsSession, current: EamsSemester, fromWeek: Int) {
+        val next = fromWeek + 1
+        if (!SemesterCalendar.hasWeek(current, next)) return
+        val start = SemesterCalendar.weekStart(current, next)
+        if (cache.load(current.id, start) != null) return
+        runCatching {
+            val fresh = repository.weekLessons(active, current.id, start)
+            cache.save(current.id, start, fresh, System.currentTimeMillis())
+            WidgetRefresh.timetable(context)
+        }
+    }
+
     suspend fun refreshAll(active: EamsSession) {
         loading = true
         error = null
@@ -151,6 +183,8 @@ fun TimetableScreen(
             val current = list.current() ?: throw EamsException("no_semester", "教务没有返回学期信息")
             semester = current
             cache.saveSemester(current)
+            // 学期落盘后小组件才能算出周次，哪怕这一周的课还没拉到也要推一次
+            WidgetRefresh.timetable(context)
             semestersLoaded = true
             maxUnit = runCatching { repository.maxUnit(active) }
                 .getOrDefault(DEFAULT_UNIT)
@@ -159,6 +193,9 @@ fun TimetableScreen(
             week = target
             applyCache(current, target)
             refreshWeek(active, current, target)
+            if (target == SemesterCalendar.weekOf(current, today)) {
+                scope.launch { prefetchNextWeek(active, current, target) }
+            }
         } catch (failure: Throwable) {
             if (failure is EamsException && failure.tokenInvalid) {
                 sessionStore.clear()
@@ -246,6 +283,7 @@ fun TimetableScreen(
                 currentWeek = currentWeek,
                 lessons = lessons,
                 today = today,
+                aliases = aliases,
                 canPrev = week > 1,
                 canNext = week < SemesterCalendar.weekCount(shownSemester),
                 onPrev = { goWeek(week - 1) },
@@ -290,6 +328,7 @@ fun TimetableScreen(
                 maxUnit = maxUnit,
                 today = today,
                 loading = loading,
+                aliases = aliases,
                 onOpen = { detail = it },
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
@@ -346,7 +385,39 @@ fun TimetableScreen(
         )
     }
 
-    detail?.let { lesson -> LessonDialog(lesson = lesson, onDismiss = { detail = null }) }
+    detail?.let { lesson ->
+        LessonDialog(
+            lesson = lesson,
+            aliases = aliases,
+            onRename = {
+                detail = null
+                renaming = lesson
+            },
+            onDismiss = { detail = null },
+        )
+    }
+
+    renaming?.let { lesson ->
+        val key = aliasStore.keyOf(lesson)
+        AliasDialog(
+            lesson = lesson,
+            initial = aliases[key].orEmpty(),
+            hasAlias = !aliases[key].isNullOrBlank(),
+            onSave = { text ->
+                aliasStore.set(lesson, text)
+                aliases = aliasStore.all()
+                renaming = null
+                WidgetRefresh.timetable(context)
+            },
+            onClear = {
+                aliasStore.clear(lesson)
+                aliases = aliasStore.all()
+                renaming = null
+                WidgetRefresh.timetable(context)
+            },
+            onDismiss = { renaming = null },
+        )
+    }
 }
 
 @Composable
@@ -406,6 +477,7 @@ private fun WeekHeader(
     currentWeek: Int,
     lessons: List<EamsLesson>,
     today: LocalDate,
+    aliases: Map<String, String>,
     canPrev: Boolean,
     canNext: Boolean,
     onPrev: () -> Unit,
@@ -419,7 +491,7 @@ private fun WeekHeader(
         if (mine.isEmpty()) {
             "今天没有课"
         } else {
-            "今天 ${mine.size} 节课 · ${mine.first().startTime} ${mine.first().courseName}"
+            "今天 ${mine.size} 节课 · ${mine.first().startTime} ${aliases.displayName(mine.first())}"
         }
     } else {
         "${weekStart.format(MONTH_DAY)} ~ ${weekStart.plusDays(6).format(MONTH_DAY)}"
@@ -474,6 +546,7 @@ private fun TimetableGrid(
     maxUnit: Int,
     today: LocalDate,
     loading: Boolean,
+    aliases: Map<String, String>,
     onOpen: (EamsLesson) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -585,6 +658,7 @@ private fun TimetableGrid(
                                 val start = (lesson.startUnit - 1).coerceAtLeast(0)
                                 val span = (lesson.endUnit - lesson.startUnit + 1).coerceAtLeast(1)
                                 val isToday = lesson.date == today
+                                val colorIndex = CourseColor.indexOf(lesson)
                                 Box(
                                     modifier = Modifier
                                         .offset(
@@ -594,17 +668,30 @@ private fun TimetableGrid(
                                         .width(columnWidth - 3.dp)
                                         .height(rowHeight * span.toFloat() - 2.dp)
                                         .clip(RoundedCornerShape(6.dp))
-                                        .background(
+                                        // 课程配色：同一门课在桌面小组件里是同一个颜色（见 ui/CourseColor.kt）
+                                        .background(CourseColor.tint(colorIndex))
+                                        // 今天这一列用课程色的细边框标出来（原来靠整块底色区分）
+                                        .then(
                                             if (isToday) {
-                                                MaterialTheme.colorScheme.primaryContainer
+                                                Modifier.border(
+                                                    width = 1.dp,
+                                                    color = CourseColor.color(colorIndex),
+                                                    shape = RoundedCornerShape(6.dp),
+                                                )
                                             } else {
-                                                MaterialTheme.colorScheme.secondaryContainer
+                                                Modifier
                                             },
                                         )
                                         .clickable { onOpen(lesson) }
                                         .padding(horizontal = 4.dp, vertical = 1.dp),
                                 ) {
-                                    CourseBlock(lesson = lesson, span = span, dense = dense, ultraDense = ultraDense)
+                                    CourseBlock(
+                                        name = aliases.displayName(lesson),
+                                        rooms = lesson.rooms,
+                                        span = span,
+                                        dense = dense,
+                                        ultraDense = ultraDense,
+                                    )
                                 }
                             }
                         }
@@ -637,12 +724,18 @@ private fun TimetableGrid(
  * 行高压到紧凑时只画课程名 + 教室，再挤就只画课程名，剩下的点开看。
  */
 @Composable
-private fun CourseBlock(lesson: EamsLesson, span: Int, dense: Boolean, ultraDense: Boolean) {
-    val room = lesson.rooms.firstOrNull()
+private fun CourseBlock(
+    name: String,
+    rooms: List<EamsRoom>,
+    span: Int,
+    dense: Boolean,
+    ultraDense: Boolean,
+) {
+    val room = rooms.firstOrNull()
     val place = room?.let { it.name.ifBlank { it.building } }.orEmpty()
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
-            text = lesson.courseName,
+            text = name,
             style = MaterialTheme.typography.labelSmall.copy(fontSize = if (ultraDense) 9.sp else 11.sp),
             fontWeight = FontWeight.Medium,
             maxLines = if (span >= 2) 2 else 1,
@@ -667,9 +760,9 @@ private fun CourseBlock(lesson: EamsLesson, span: Int, dense: Boolean, ultraDens
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (!dense && span >= 2 && lesson.rooms.size > 1) {
+            if (!dense && span >= 2 && rooms.size > 1) {
                 Text(
-                    text = "等 ${lesson.rooms.size} 处",
+                    text = "等 ${rooms.size} 处",
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 11.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -763,6 +856,11 @@ private fun EamsLoginDialog(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Text(
+                    text = "目前只支持安徽理工大学的教务系统，其它学校的账号登不进来。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -810,12 +908,26 @@ private fun EamsLoginDialog(
 }
 
 @Composable
-private fun LessonDialog(lesson: EamsLesson, onDismiss: () -> Unit) {
+private fun LessonDialog(
+    lesson: EamsLesson,
+    aliases: Map<String, String>,
+    onRename: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val key = lesson.courseCode.trim().ifBlank { lesson.courseName.trim() }
+    val alias = aliases[key]?.takeIf { it.isNotBlank() }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(lesson.courseName) },
+        title = { Text(alias ?: lesson.courseName) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (alias != null) {
+                    Text(
+                        text = "原名：${lesson.courseName}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Text("${lesson.startTime} - ${lesson.endTime}（第 ${lesson.startUnit}-${lesson.endUnit} 节）")
                 if (lesson.teacherNames.isNotEmpty()) Text("教师：${lesson.teacherNames}")
                 if (lesson.roomNames.isNotEmpty()) Text("地点：${lesson.roomNames}")
@@ -827,7 +939,67 @@ private fun LessonDialog(lesson: EamsLesson, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("知道了") } },
+        confirmButton = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onRename) {
+                    Text(if (alias == null) "起个名字" else "改别名")
+                }
+                TextButton(onClick = onDismiss) { Text("知道了") }
+            }
+        },
+    )
+}
+
+/**
+ * 起别名：教务的课名常常长到放不下（「职业发展（生涯规划）指导」），
+ * 起个短名字，课表格子和桌面小组件都跟着变。
+ */
+@Composable
+private fun AliasDialog(
+    lesson: EamsLesson,
+    initial: String,
+    hasAlias: Boolean,
+    onSave: (String) -> Unit,
+    onClear: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("起个名字") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "原名：${lesson.courseName}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("别名") },
+                    placeholder = { Text("例如：高数") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = "课表格子和桌面小组件都会显示这个名字。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (hasAlias) {
+                    TextButton(onClick = onClear) { Text("恢复原名") }
+                }
+                TextButton(enabled = text.isNotBlank(), onClick = { onSave(text) }) {
+                    Text("保存")
+                }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )
 }
 
