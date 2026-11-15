@@ -23,7 +23,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -44,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebSettingsCompat
@@ -77,6 +82,9 @@ fun WebShell(
     var loading by remember { mutableStateOf(true) }
     var errorUrl by remember { mutableStateOf<String?>(null) }
     var canGoBack by remember { mutableStateOf(false) }
+    // 顶栏：网页标题 + 当前地址（地址单行省略，长链接不撑高顶栏）
+    var pageTitle by remember { mutableStateOf("") }
+    var currentUrl by remember { mutableStateOf(targetUrl) }
     // 网页详情依赖官方站点的 localStorage.Token；注入一次后重载，让页面启动时就能读到
     val seeded = remember { mutableStateOf(false) }
     // 注入期间先遮住 WebView，避免用户看到首页闪一下再跳详情
@@ -130,6 +138,7 @@ fun WebShell(
                     errorUrl = null
                     loading = true
                     progress = 0
+                    currentUrl = url
                 }
 
                 override fun onPageFinished(view: WebView, url: String) {
@@ -160,6 +169,7 @@ fun WebShell(
 
                 override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
                     canGoBack = view.canGoBack()
+                    currentUrl = url
                 }
 
                 override fun onReceivedError(
@@ -188,6 +198,10 @@ fun WebShell(
             webChromeClient = object : WebChromeClient() {
                 override fun onProgressChanged(view: WebView, newProgress: Int) {
                     progress = newProgress
+                }
+
+                override fun onReceivedTitle(view: WebView, title: String?) {
+                    pageTitle = title.orEmpty()
                 }
 
                 override fun onShowFileChooser(
@@ -228,61 +242,84 @@ fun WebShell(
         webView.goBack()
     }
 
-    Box(modifier = modifier) {
-        // 不再套 SwipeRefreshLayout：官方页面自带内部滚动，下拉手势会被外层吃掉，
-        // 表现就是「往下滑不滚动、反而刷新」。刷新改成右上角按钮，滚动全部交还给网页。
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { webView },
-        )
-
+    // 顶栏压在最上面，网页占剩下的高度：原来是两个悬浮按钮，会挡住网页内容
+    Column(modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 2.dp, end = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (onClose != null) {
+                TextButton(onClick = onClose) { Text("返回") }
+            } else {
+                Spacer(Modifier.width(8.dp))
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = pageTitle.ifBlank { "官方页面" },
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = humanUrl(currentUrl),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            TextButton(onClick = { webView.reload() }) { Text("刷新") }
+        }
         if (loading && progress in 1..99) {
             LinearProgressIndicator(
                 progress = { progress / 100f },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.TopCenter),
+                    .height(2.dp),
             )
         }
-
-        errorUrl?.let { failed ->
-            ErrorPane(
-                onRetry = {
-                    errorUrl = null
-                    webView.reload()
-                },
-                onOpenInBrowser = { openExternal(context, Uri.parse(failed)) },
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            // 不套 SwipeRefreshLayout：官方页面自带内部滚动，下拉手势会被外层吃掉，
+            // 表现就是「往下滑不滚动、反而刷新」。刷新交给顶栏，滚动全部交还给网页。
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { webView },
             )
-        }
 
-        if (!ready) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
-                contentAlignment = Alignment.Center,
-            ) {
-                PageLoading()
+            errorUrl?.let { failed ->
+                ErrorPane(
+                    onRetry = {
+                        errorUrl = null
+                        webView.reload()
+                    },
+                    onOpenInBrowser = { openExternal(context, Uri.parse(failed)) },
+                )
             }
-        }
 
-        onClose?.let { close ->
-            TextButton(
-                onClick = close,
-                modifier = Modifier.align(Alignment.TopStart),
-            ) {
-                Text("返回")
+            if (!ready) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PageLoading()
+                }
             }
-        }
-
-        TextButton(
-            onClick = { webView.reload() },
-            modifier = Modifier.align(Alignment.TopEnd),
-        ) {
-            Text("刷新")
         }
     }
 }
+
+/** 顶栏里那行小字：去掉协议头，只留「域名/路径」。 */
+private fun humanUrl(url: String): String =
+    url.removePrefix("https://").removePrefix("http://").ifBlank { url }
 
 @Composable
 private fun ErrorPane(onRetry: () -> Unit, onOpenInBrowser: () -> Unit) {
