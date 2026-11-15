@@ -70,6 +70,11 @@ fun SettingsScreen(
     onSectionChange: (SettingsSection) -> Unit,
     onLogout: () -> Unit,
     onShowDisclaimer: () -> Unit,
+    /**
+     * 启动时自动检查发现新版本后，主界面会把这个数加一，让设置页直接弹出更新对话框。
+     * 0 表示不自动检查（用户手动点「检查」照常可用）。
+     */
+    autoCheckUpdate: Int = 0,
 ) {
     var categories by remember { mutableStateOf<List<Pair<Int, String>>>(emptyList()) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
@@ -82,6 +87,39 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val updateChecker = remember { UpdateChecker() }
+
+    // 手动点「检查」和「启动时发现新版本被引导过来」走同一段逻辑，
+    // 区别只在于：手动点必须给反馈（已是最新 / 获取失败），自动检查失败则静默。
+    fun startUpdateCheck() {
+        if (checking) return
+        checking = true
+        scope.launch {
+            val result = runCatching { updateChecker.check(AppConfig.VERSION) }
+                .getOrElse { UpdateResult.Failed(it.message ?: "网络不稳定") }
+            checking = false
+            updateDialog = when (result) {
+                is UpdateResult.Available -> {
+                    updateStatus = null
+                    updateProgress = null
+                    UpdateDialog.Available(
+                        version = result.version.toString(),
+                        url = result.url,
+                        notes = result.notes,
+                        apkUrl = result.apkUrl,
+                    )
+                }
+
+                UpdateResult.UpToDate -> UpdateDialog.Message("已经是最新版本（${AppConfig.VERSION}）。")
+                UpdateResult.NoRelease -> UpdateDialog.Message("仓库里还没有发布版本。")
+                is UpdateResult.Failed -> UpdateDialog.Message("获取更新失败：${result.message}")
+            }
+        }
+    }
+
+    // 启动时自动检查发现新版本 → 主界面把 autoCheckUpdate 加一 → 这里直接把更新对话框弹出来
+    LaunchedEffect(autoCheckUpdate) {
+        if (autoCheckUpdate > 0) startUpdateCheck()
+    }
 
     LaunchedEffect(Unit) {
         runCatching { repository.categories(token) }.onSuccess { categories = it }
@@ -273,29 +311,7 @@ fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = !checking) {
-                        checking = true
-                        scope.launch {
-                            val result = updateChecker.check(AppConfig.VERSION)
-                            checking = false
-                            updateDialog = when (result) {
-                                is UpdateResult.Available -> {
-                                    updateStatus = null
-                                    updateProgress = null
-                                    UpdateDialog.Available(
-                                        version = result.version.toString(),
-                                        url = result.url,
-                                        notes = result.notes,
-                                        apkUrl = result.apkUrl,
-                                    )
-                                }
-
-                                UpdateResult.UpToDate -> UpdateDialog.Message("已经是最新版本（${AppConfig.VERSION}）。")
-                                UpdateResult.NoRelease -> UpdateDialog.Message("仓库里还没有发布版本。")
-                                is UpdateResult.Failed -> UpdateDialog.Message("检查失败：${result.message}")
-                            }
-                        }
-                    }
+                    .clickable(enabled = !checking) { startUpdateCheck() }
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

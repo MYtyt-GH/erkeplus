@@ -56,6 +56,9 @@ import gitee.leolin_me.erkepp.data.CreditDetail
 import gitee.leolin_me.erkepp.data.CreditRepository
 import gitee.leolin_me.erkepp.data.ProfileRepository
 import gitee.leolin_me.erkepp.data.RankRepository
+import gitee.leolin_me.erkepp.data.UpdateChecker
+import gitee.leolin_me.erkepp.data.UpdateResult
+import gitee.leolin_me.erkepp.data.Version
 import gitee.leolin_me.erkepp.data.RankScope
 import gitee.leolin_me.erkepp.data.OrgDetailPrefetch
 import gitee.leolin_me.erkepp.data.OrganizationRepository
@@ -224,18 +227,50 @@ class MainActivity : ComponentActivity() {
         val eamsRepository = gitee.leolin_me.erkepp.data.eams.EamsRepository()
         val eamsSessionStore = gitee.leolin_me.erkepp.data.eams.EamsSessionStore(this)
         val timetableCache = gitee.leolin_me.erkepp.data.eams.TimetableCache(this)
+        val updateChecker = UpdateChecker()
         Startup.mark("repositories")
 
         setContent {
             Startup.mark("setContent")
             ErkeppTheme {
                 var warmUpPages by remember { mutableStateOf(false) }
+                // 启动自动检查更新的结果：只有「有新版本」才赋值，其余情况保持 null（静默）
+                var updatePrompt by remember { mutableStateOf<UpdateResult.Available?>(null) }
+                // 加一 → 设置页自动弹一次更新对话框（「去更新」用）
+                var autoCheckUpdate by remember { mutableIntStateOf(0) }
+                // 「去更新」要切到设置页，但切页函数 goTab 只在那段作用域里可见，
+                // 所以这里打个标记，由那份作用域里的效果来执行
+                var pendingGoSettings by remember { mutableStateOf(false) }
                 LaunchedEffect(Unit) {
                     withFrameNanos { }
                     Startup.mark("first frame")
                     // 首帧画完再把另外两页组合出来：启动只画发现页，滑动时它们已经就绪
                     withFrameNanos { }
                     warmUpPages = true
+                }
+                // 启动自动检查更新：只在真的有新版本时提示一次；没更新、断网、接口挂了都静默。
+                // 等首帧之后再查，别跟启动抢网络和主线程。
+                // 调试用 `--es fake_update 1.2.3` 可以跳过网络直接走一遍「发现新版本 → 去更新」。
+                LaunchedEffect(Unit) {
+                    withFrameNanos { }
+                    val fake = if (BuildConfig.DEBUG) intent.getStringExtra("fake_update") else null
+                    if (fake != null) {
+                        val version = Version.parse(fake) ?: return@LaunchedEffect
+                        updatePrompt = UpdateResult.Available(version, "", "调试用：模拟发现新版本。")
+                        return@LaunchedEffect
+                    }
+                    val result = runCatching { updateChecker.check(AppConfig.VERSION) }.getOrNull()
+                    AppLog.d(
+                        "update",
+                        "startup check -> " + when (result) {
+                            is UpdateResult.Available -> "available ${result.version}"
+                            null -> "failed"
+                            UpdateResult.UpToDate -> "up to date"
+                            UpdateResult.NoRelease -> "no release"
+                            is UpdateResult.Failed -> "failed: ${result.message}"
+                        },
+                    )
+                    if (result is UpdateResult.Available) updatePrompt = result
                 }
                 var session by remember {
                     val loaded = sessionStore.load()
@@ -841,6 +876,16 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
+                            // 启动时发现新版本 → 弹窗点「去更新」：切到设置页，
+                            // 并让设置页自动弹一次更新对话框（autoCheckUpdate 加过一）
+                            LaunchedEffect(pendingGoSettings) {
+                                if (pendingGoSettings) {
+                                    pendingGoSettings = false
+                                    settingsSection = SettingsSection.ROOT
+                                    goTab(MainTab.SETTINGS)
+                                }
+                            }
+
                             LaunchedEffect(pagerState) {
                                 snapshotFlow { pagerState.currentPage }.collect { page ->
                                     tab = MainTab.entries[page]
@@ -978,6 +1023,7 @@ class MainActivity : ComponentActivity() {
                                                 tab = MainTab.DISCOVER
                                             },
                                             onShowDisclaimer = { showDisclaimer = true },
+                                            autoCheckUpdate = autoCheckUpdate,
                                         )
                                     }
                                 }
@@ -1672,6 +1718,34 @@ class MainActivity : ComponentActivity() {
                         onAccept = {
                             preferences.disclaimerAccepted = true
                             showDisclaimer = false
+                        },
+                    )
+                }
+
+                // 启动时检查更新的结果。没有新版本、或者检查失败（断网等）都不弹任何东西——
+                // 用户没主动问，就别打扰。只有真的发现新版本才提示一次，并引导到设置里的更新。
+                updatePrompt?.let { info ->
+                    AlertDialog(
+                        onDismissRequest = { updatePrompt = null },
+                        title = { Text("发现新版本 ${info.version}") },
+                        text = {
+                            Text(
+                                text = info.notes.trim().take(300).ifBlank { "建议更新到最新版本。" },
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    updatePrompt = null
+                                    // 让设置页自己把更新对话框弹出来（同一个检查逻辑）
+                                    autoCheckUpdate += 1
+                                    pendingGoSettings = true
+                                },
+                            ) { Text("去更新") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { updatePrompt = null }) { Text("以后再说") }
                         },
                     )
                 }
