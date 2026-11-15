@@ -460,19 +460,19 @@ private fun TimetableGrid(
     val vScroll = rememberScrollState()
 
     BoxWithConstraints(modifier = modifier) {
-        val headerHeight = 24.dp
-        // 屏幕越窄，节次栏越窄；最窄 44dp
-        val gutterWidth = (maxWidth * 0.13f).coerceIn(44.dp, 58.dp)
-        val columnWidth = (maxWidth / 7f).coerceIn(96.dp, 168.dp)
-
-        val available = (maxHeight - headerHeight).coerceAtLeast(1.dp)
-        val naturalRow = available / maxUnit.toFloat()
-        // 系统字号调大时，行也得跟着变高，否则文字会被裁掉
-        val minRow = (34.dp * fontScale).coerceAtLeast(34.dp)
-        val scrollVertically = naturalRow < minRow
-        val rowHeight = if (scrollVertically) minRow else naturalRow
-        val dense = rowHeight < 46.dp
-        val ultraDense = rowHeight < 38.dp
+        val metrics = TimetableLayout.of(
+            availableWidthDp = maxWidth.value,
+            availableHeightDp = maxHeight.value,
+            maxUnit = maxUnit,
+            fontScale = fontScale,
+        )
+        val headerHeight = TimetableLayout.HEADER_DP.dp
+        val gutterWidth = metrics.gutterWidthDp.dp
+        val columnWidth = metrics.columnWidthDp.dp
+        val rowHeight = metrics.rowHeightDp.dp
+        val dense = metrics.dense
+        val scrollVertically = metrics.mode == TimetableMode.SCROLL
+        val ultraDense = rowHeight < 30.dp
 
         val table: @Composable () -> Unit = {
             Row(modifier = Modifier.fillMaxWidth()) {
