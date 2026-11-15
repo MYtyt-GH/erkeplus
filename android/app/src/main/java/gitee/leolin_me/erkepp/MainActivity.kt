@@ -62,6 +62,7 @@ import gitee.leolin_me.erkepp.data.Version
 import gitee.leolin_me.erkepp.data.RankScope
 import gitee.leolin_me.erkepp.data.OrgDetailPrefetch
 import gitee.leolin_me.erkepp.data.OrganizationRepository
+import gitee.leolin_me.erkepp.data.NotifyRepository
 import gitee.leolin_me.erkepp.data.UserRepository
 import gitee.leolin_me.erkepp.data.SignSandboxStore
 import gitee.leolin_me.erkepp.data.sandboxSubmit
@@ -97,6 +98,7 @@ import gitee.leolin_me.erkepp.ui.login.ForgotPasswordScreen
 import gitee.leolin_me.erkepp.ui.login.LoginScreen
 import gitee.leolin_me.erkepp.ui.more.MoreScreen
 import gitee.leolin_me.erkepp.ui.more.WidgetScreen
+import gitee.leolin_me.erkepp.ui.notify.NotifyScreen
 import gitee.leolin_me.erkepp.ui.org.AllOrganizationsScreen
 import gitee.leolin_me.erkepp.ui.org.OrgDetailScreen
 import gitee.leolin_me.erkepp.ui.org.OrganizationScreen
@@ -221,6 +223,7 @@ class MainActivity : ComponentActivity() {
         val creditRepository = CreditRepository(apiClient)
         val rankRepository = RankRepository(apiClient)
         val organizationRepository = OrganizationRepository(apiClient)
+        val notifyRepository = NotifyRepository(apiClient)
         val profileRepository = ProfileRepository(apiClient)
         val userRepository = UserRepository(apiClient)
         val storageRepository = StorageRepository()
@@ -319,6 +322,8 @@ class MainActivity : ComponentActivity() {
                 var showJoinScan by remember { mutableStateOf(false) }
                 // 「我的」里的我的组织，和它点开的详情
                 var showOrganizations by remember { mutableStateOf(false) }
+                // 「我的」里的我的阅办（官方 #/needDealt）：待办 + 消息
+                var showNotices by remember { mutableStateOf(false) }
                 var orgDetailTarget by remember { mutableStateOf<Pair<Long, String>?>(null) }
                 // 别人的主页（官方 #/userShows/<id>），以及它点开的「参加的活动」
                 var userPageTarget by remember { mutableStateOf<Long?>(null) }
@@ -693,6 +698,95 @@ class MainActivity : ComponentActivity() {
                                     .getOrElse { "ERR ${it.message}" },
                             )
                         }
+                        // 「我的阅办」的解析结果（只打 id / 类型 / 已读，不打正文）。
+                        // read 与 read-all 是写操作：会把真实账号的消息标成已读，跑之前看清楚 probe 名
+                        "notify_list" -> {
+                            val pages = intent.getStringExtra("pages")?.toIntOrNull() ?: 3
+                            for (p in 1..pages) {
+                                val loaded = runCatching { notifyRepository.list(current.token, p) }
+                                val result = loaded.getOrNull()
+                                if (result == null) {
+                                    AppLog.d(
+                                        "notify",
+                                        "list p=$p ERR ${loaded.exceptionOrNull()?.let { "${it::class.simpleName}: ${it.message}" }}",
+                                    )
+                                    break
+                                }
+                                AppLog.d(
+                                    "notify",
+                                    "list p=$p total=${result.total} got=${result.list.size} last=${result.lastPage}",
+                                )
+                                result.list.forEach { notice ->
+                                    AppLog.d(
+                                        "notify",
+                                        "item id=${notice.id} type=${notice.type}/${notice.subType} " +
+                                            "read=${notice.isRead} jump=${notice.jumpInfo} " +
+                                            "mgr=${notice.managerId} ctime=${notice.ctime}",
+                                    )
+                                }
+                                if (result.lastPage) break
+                            }
+                            AppLog.d(
+                                "notify",
+                                "unread=" + runCatching { notifyRepository.unreadCount(current.token) }
+                                    .getOrElse { -1 },
+                            )
+                        }
+                        "notify_read" -> {
+                            val id = intent.getLongExtra("notice_id", 0L)
+                            val result = runCatching { notifyRepository.markRead(current.token, id) }
+                            AppLog.d(
+                                "notify",
+                                "read id=$id " + if (result.isSuccess) "ok" else "ERR ${result.exceptionOrNull()?.message}",
+                            )
+                            AppLog.d(
+                                "notify",
+                                "after read unread=" + runCatching { notifyRepository.unreadCount(current.token) }
+                                    .getOrElse { -1 },
+                            )
+                        }
+                        "notify_read_all" -> {
+                            AppLog.d(
+                                "notify",
+                                "read-all before=" + runCatching { notifyRepository.unreadCount(current.token) }
+                                    .getOrElse { -1 },
+                            )
+                            val result = runCatching { notifyRepository.markAllRead(current.token) }
+                            AppLog.d(
+                                "notify",
+                                "read-all " + if (result.isSuccess) "ok" else "ERR ${result.exceptionOrNull()?.message}",
+                            )
+                            AppLog.d(
+                                "notify",
+                                "read-all after=" + runCatching { notifyRepository.unreadCount(current.token) }
+                                    .getOrElse { -1 },
+                            )
+                            val page = runCatching { notifyRepository.list(current.token, 1) }.getOrNull()
+                            AppLog.d(
+                                "notify",
+                                "read-all page1 unreadItems=${page?.list?.count { !it.isRead } ?: -1} " +
+                                    "total=${page?.total ?: -1}",
+                            )
+                        }
+                        "processing" -> {
+                            val works = runCatching { notifyRepository.processing(current.token) }
+                            AppLog.d(
+                                "notify",
+                                "processing " + works.map { list ->
+                                    list.joinToString(" | ") { "${it.workDes}/${it.count}/${it.route}" }
+                                }.getOrElse { "ERR ${it::class.simpleName}: ${it.message}" },
+                            )
+                            val stats = runCatching {
+                                apiClient.get("activity/processing/statistics", buildJsonObject {}, current.token)
+                            }
+                            AppLog.d(
+                                "notify",
+                                "statistics " + stats.map { it.toString().take(1200) }
+                                    .getOrElse { "ERR ${it.message}" },
+                            )
+                        }
+                        // 直接打开「我的阅办」，走查时不用点路径
+                        "notices" -> showNotices = true
                         // 人物详情：官方 #/userShows/<id> 用的那一个接口，先只看字段
                         "user_probe" -> {
                             val userId = intent.getLongExtra("user_id", 1908337L)
@@ -1005,6 +1099,7 @@ class MainActivity : ComponentActivity() {
                                             onOpenCredit = { showCredit = true },
                                             onOpenRank = { showRank = true },
                                             onOpenOrganizations = { showOrganizations = true },
+                                            onOpenNotices = { showNotices = true },
                                             onOpenAttachments = { attachmentsVisible = true },
                                             onOpenTimetable = { showTimetable = true },
                                         )
@@ -1250,6 +1345,31 @@ class MainActivity : ComponentActivity() {
                                         preloadEnabled = preferences.preloadEnabled,
                                         onOpenOrg = { id, name -> openOrg(id, name) },
                                         onBack = { uiState = uiState.copy(showAllOrgs = false) },
+                                    )
+                                }
+                            }
+
+                            // 我的阅办（官方 #/needDealt）：待办 + 消息。
+                            // 压在「我的组织」下面：消息里点「加入组织」落到我的组织时，
+                            // 返回还能回到阅办刚才的位置，而不是一路退回「我的」。
+                            if (showNotices) {
+                                SecondaryPage(onBack = { showNotices = false }) {
+                                    NotifyScreen(
+                                        token = current.token,
+                                        repository = notifyRepository,
+                                        myUserId = current.profile.userId,
+                                        preloadEnabled = preferences.preloadEnabled,
+                                        onOpenActivity = { id -> openActivity(id) },
+                                        onOpenOrganizations = { showOrganizations = true },
+                                        onOpenOrganization = { id -> openOrg(id, "") },
+                                        onOpenWorkRoute = { route ->
+                                            // 待办的路由是官方 H5 的路由（/activityAudit/xxx 这类），
+                                            // 原生页对不上，只能整条丢给网页壳
+                                            val path = route.trim()
+                                            webUrl = "https://${AppConfig.ALLOWED_HOST}/#" +
+                                                if (path.startsWith("/")) path else "/$path"
+                                        },
+                                        onBack = { showNotices = false },
                                     )
                                 }
                             }

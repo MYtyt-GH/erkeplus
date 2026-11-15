@@ -23,10 +23,13 @@ private val DarkColors = darkColorScheme(
     onSurface = Color(0xFFE3E4E6),
 )
 
+/**
+ * [darkTheme] 默认跟随系统；只有 debug 的预览页会传值，用来在同一台机器上看两套主题。
+ */
 @Composable
-fun ErkeppTheme(content: @Composable () -> Unit) {
+fun ErkeppTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
+        colorScheme = if (darkTheme) DarkColors else LightColors,
         content = content,
     )
 }

@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="window_background">#FFF7F8FA</color>
-    <color name="ic_launcher_background">#FF1A5FB4</color>
+    <!--
+        桌面图标的底色。取的是图标原图自己的蓝（#002B9F），所以前景图里那些「透出来的
+        底色」和这一层是同一个颜色，圆角/圆形遮罩外不会有一圈色差。
+        values-night 里也有一份同样的值：图标不随深色模式变色，两处必须一致。
+    -->
+    <color name="ic_launcher_background">#FF002B9F</color>
 
     <!--
         桌面小组件的配色。Compose 的配色没法当资源给 RemoteViews 用，所以这里单独一份，

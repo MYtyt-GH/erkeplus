@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="window_background">#FF101114</color>
-    <color name="ic_launcher_background">#FF1A5FB4</color>
+    <color name="ic_launcher_background">#FF002B9F</color>
 
     <!-- 深色：与 ui/Theme.kt 的 DarkColors 对齐，见 values/colors.xml 的说明 -->
     <color name="widget_surface">#FF101114</color>

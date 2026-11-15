@@ -61,6 +61,7 @@ fun ProfileScreen(
     onOpenCredit: () -> Unit,
     onOpenRank: () -> Unit,
     onOpenOrganizations: () -> Unit,
+    onOpenNotices: () -> Unit,
     onOpenAttachments: () -> Unit,
     onOpenTimetable: () -> Unit,
 ) {
@@ -156,6 +157,11 @@ fun ProfileScreen(
                         title = "我的组织",
                         subtitle = "我加入的、我创建的、我退出的，以及待审核的申请",
                         onClick = onOpenOrganizations,
+                    )
+                    EntryRow(
+                        title = "我的阅办",
+                        subtitle = "要处理的事，和系统发给我的通知",
+                        onClick = onOpenNotices,
                     )
                     EntryRow(
                         title = "我的附件",

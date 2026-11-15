@@ -948,37 +948,39 @@ waitingAuditCcMembers           待审核抄送成员
 2. `data.lastPage` 全站都没有这个字段，H5 拿它判断「没有更多」永远拿到 `undefined`，
    只能靠一直翻到空列表。客户端不要照抄。
 
-### 写（源码核对，未执行）
+### 写（`read` / `read-all` 2026-11-15 实测；`clean` 仍未执行）
 
-| 动作 | 请求 | 触发方式 |
-| --- | --- | --- |
-| 单条已读 | `POST /message/notice/read`　`{id: <消息 id>}` | 点开一条 `isRead==0` 的消息时自动发，成功后重拉列表 |
-| 全部已读 | `POST /message/notice/read-all`　`{id: 0}` | 点「N 条未读通知」那颗按钮（模板里就是 `readNotice(0)`） |
-| 清空全部 | `POST /message/notice/clean`　`{id: null}` | 列表右上角垃圾桶，弹「确定清空所有通知吗？」 |
-| 单条删除 | `POST /message/notice/clean`　`{id: <消息 id>}` | 同上接口带 id；**不是** `message/delete` |
+| 动作 | 请求 | 触发方式 | 实测 |
+| --- | --- | --- | --- |
+| 单条已读 | `POST /message/notice/read`　`{id: <消息 id>}` | 点开一条 `isRead==0` 的消息时自动发，成功后重拉列表 | ✅ 返回 `code:0` + `msg:"ok"`；未读数 10 → 9 |
+| 全部已读 | `POST /message/notice/read-all`　`{id: 0}` | 点「N 条未读通知」那颗按钮（模板里就是 `readNotice(0)`） | ✅ 返回同上；未读数 9 → 0，列表 `isRead` 全部变 1 |
+| 清空全部 | `POST /message/notice/clean`　`{id: null}` | 列表右上角垃圾桶，弹「确定清空所有通知吗？」 | 未执行（客户端不做删除） |
+| 单条删除 | `POST /message/notice/clean`　`{id: <消息 id>}` | 同上接口带 id；**不是** `message/delete` | 未执行（客户端不做删除） |
 
+- 两个已读接口都是 POST + `params` 表单，参数只有 `id`，鉴权同列表。
+- 全部已读之后 `unReadCount` **立刻**变 0、第 1 页 `isRead` 同步变 1，没有延迟或缓存。
+- 已读是**账号级**状态：标完之后没有任何接口能改回未读（官方也没有「标为未读」），
+  所以客户端的「全部标为已读」不弹二次确认——和官方一样点一下就生效。
 - 删除与清空**共用 `message/notice/clean`**，靠 `id` 是否为空区分；此前文档里提到的
   `message/delete` 只出现在别的页面（`static/js/131.*.js` 里是 `/messages`），不要混用。
-- 这几个都是写操作，按项目红线**未实测**；接入前必须真机提一次并记录返回结构。
 
 ### 点一条消息落到哪（H5 源码的分支表）
 
 官方是一个超长的 `type` / `subType` 分支。与我们已有页面相关的只有三条：
 
-| 条件 | 官方落点 | 我方现状 |
+| 条件 | 官方落点 | 客户端（2026-11-15 已接） |
 | --- | --- | --- |
-| `type=2` 且 `managerId != 我` 且 subType ∉ {178,179 请假, 177 审核请假, 34 消息类型} | 活动详情（只读） | 有（`ActivityDetailScreen`） |
-| `type=3`，subType ∈ {13 加入组织, 19} | `/myApplyorg`（我申请的组织） | 有（「我的组织」页） |
-| `type=3`，其它 subType | `/orgDetail/{jumpInfo}` | 有（`OrgDetailScreen`） |
-| `type=2` 且 `managerId == 我` | 管理员视角活动页 | 无 |
-| `type=162` 黑名单通知 | **不跳转**，只标记已读 | 无需跳转 |
-| 其余 type（4/22/28/31/36/43/48/52/55/58/61/64/68/70/73/76/87/91/100/105/108/111/131/133/135…） | 各自的管理/申报页 | 无，回退到「打开官方页面」 |
+| `type=2` 且 `managerId != 我` 且 subType ∉ {178,179 请假, 177 审核请假, 34 消息类型} | 活动详情（只读） | 活动详情 |
+| `type=3`，subType ∈ {13 加入组织, 19} | `/myApplyorg`（我申请的组织） | 「我的组织」 |
+| `type=3`，其它 subType | `/orgDetail/{jumpInfo}` | 组织详情 |
+| `type=2` 且 `managerId == 我` | 管理员视角活动页 | 没有这个页面：只标已读，正文在本地弹窗里给全 |
+| `type=162` 黑名单通知 | **不跳转**，只标记已读 | 同左（弹窗给全文） |
+| 其余 type（4/22/28/31/36/43/48/52/55/58/61/64/68/70/73/76/87/91/100/105/108/111/131/133/135…） | 各自的管理/申报页 | 路径没实测过，**不猜**：只标已读 + 弹窗给全文 |
 
 ## 尚未验证
 
 - 报名、取消、签到等**写操作**（未验证，禁止先行接入）
-- 我的消息的三个写接口（`notice/read`、`notice/read-all`、`notice/clean`）：参数来自源码，
-  实际返回与副作用未测
+- 我的消息的 `notice/clean`（清空 / 单条删除）：仍未执行（客户端不做删除）
 - 待办 18 个计数的真实触发条件（学生账号全为 0，管理员视角未测）
 - `activity/processing/list` 的元素真实取值（`icon` / `workDes` / `count` / `route` 只有字段名可信）
 - 已办 tab 的 `activity/activity/listByTeacher` 响应结构（仅组织账号可见，无样本）
