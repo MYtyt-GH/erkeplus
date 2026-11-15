@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -431,10 +432,18 @@ private fun WeekHeader(
 }
 
 /**
- * 课表本体：占满剩余高度、不上下滚动，只有横向滑动。
+ * 课表本体，按屏幕大小自适应。
  *
- * 左侧固定节次与上课时间，右侧整块（表头 + 网格）共用一个横向滚动状态，列始终对齐；
- * 每行高度 = (可用高度 − 表头) / 每天节数，所以 12 节一定一屏装得下。
+ * 用户手上的手机尺寸不一样，所以这里没有写死「一屏几行、每列多宽」：
+ * - **列宽**取 `屏宽 / 7` 再夹到 96dp–168dp：宽屏（平板、横屏）7 天一次看全，
+ *   窄屏就横向滑，一屏大约 3 天；
+ * - **行高**取 `(可用高度 − 表头) / 每天节数`，12 节默认一屏装满；
+ * - 但行高压到 34dp×字体缩放 以下时，字就放不下了 —— 这时**放弃「一屏装满」**，
+ *   给行高一个下限并允许整块竖向滚动。宁可滚动，也不把三行字挤成一条线；
+ * - 行高 < 46dp 视为紧凑模式：课程块只显示课程名 + 教室（教室名本身带楼宇前缀），
+ *   节次栏只显示节次号。
+ *
+ * 左侧固定节次与上课时间，右侧表头与网格共用一个横向滚动状态，列始终对齐。
  */
 @Composable
 private fun TimetableGrid(
@@ -446,121 +455,146 @@ private fun TimetableGrid(
     onOpen: (EamsLesson) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val columnWidth = 116.dp
-    val gutterWidth = 54.dp
-    val headerHeight = 24.dp
+    val fontScale = LocalDensity.current.fontScale
     val hScroll = rememberScrollState()
+    val vScroll = rememberScrollState()
 
     BoxWithConstraints(modifier = modifier) {
-        val rowHeight = ((maxHeight - headerHeight) / maxUnit.toFloat()).coerceAtLeast(24.dp)
+        val headerHeight = 24.dp
+        // 屏幕越窄，节次栏越窄；最窄 44dp
+        val gutterWidth = (maxWidth * 0.13f).coerceIn(44.dp, 58.dp)
+        val columnWidth = (maxWidth / 7f).coerceIn(96.dp, 168.dp)
 
-        Row(modifier = Modifier.fillMaxSize()) {
-            // 节次 + 上课时间
-            Column(modifier = Modifier.width(gutterWidth).fillMaxHeight()) {
-                Spacer(Modifier.height(headerHeight))
-                repeat(maxUnit) { index ->
-                    val slot = LESSON_SLOTS.getOrNull(index)
-                    Column(
-                        modifier = Modifier.height(rowHeight).fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Text(
-                            text = "${index + 1}",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        if (slot != null) {
-                            Text(
-                                text = slot.start,
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
+        val available = (maxHeight - headerHeight).coerceAtLeast(1.dp)
+        val naturalRow = available / maxUnit.toFloat()
+        // 系统字号调大时，行也得跟着变高，否则文字会被裁掉
+        val minRow = (34.dp * fontScale).coerceAtLeast(34.dp)
+        val scrollVertically = naturalRow < minRow
+        val rowHeight = if (scrollVertically) minRow else naturalRow
+        val dense = rowHeight < 46.dp
+        val ultraDense = rowHeight < 38.dp
 
-            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                // 表头：周几 + 日期
-                Row(modifier = Modifier.height(headerHeight).horizontalScroll(hScroll)) {
-                    repeat(7) { index ->
-                        val date = weekStart.plusDays(index.toLong())
-                        val isToday = date == today
-                        Box(
-                            modifier = Modifier.width(columnWidth).fillMaxHeight(),
-                            contentAlignment = Alignment.Center,
+        val table: @Composable () -> Unit = {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                // 节次 + 上课时间
+                Column(modifier = Modifier.width(gutterWidth)) {
+                    Spacer(Modifier.height(headerHeight))
+                    repeat(maxUnit) { index ->
+                        val slot = LESSON_SLOTS.getOrNull(index)
+                        Column(
+                            modifier = Modifier.height(rowHeight).fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
                         ) {
                             Text(
-                                text = "${WEEK_LABELS[index]} ${date.dayOfMonth}",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (isToday) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
+                                text = "${index + 1}",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = if (ultraDense) 9.sp else 10.sp,
+                                ),
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
+                            if (slot != null && !ultraDense) {
+                                Text(
+                                    text = slot.start,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }
 
-                Box(modifier = Modifier.fillMaxSize().horizontalScroll(hScroll)) {
+                Column(modifier = Modifier.weight(1f)) {
+                    // 表头：周几 + 日期
+                    Row(modifier = Modifier.height(headerHeight).horizontalScroll(hScroll)) {
+                        repeat(7) { index ->
+                            val date = weekStart.plusDays(index.toLong())
+                            val isToday = date == today
+                            Box(
+                                modifier = Modifier.width(columnWidth).fillMaxHeight(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = "${WEEK_LABELS[index]} ${date.dayOfMonth}",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                                    fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (isToday) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                )
+                            }
+                        }
+                    }
+
                     Box(
                         modifier = Modifier
-                            .width(columnWidth * 7f)
-                            .height(rowHeight * maxUnit.toFloat()),
+                            .height(rowHeight * maxUnit.toFloat())
+                            .horizontalScroll(hScroll),
                     ) {
-                        repeat(8) { index ->
-                            Box(
-                                modifier = Modifier
-                                    .offset(x = columnWidth * index.toFloat())
-                                    .width(1.dp)
-                                    .height(rowHeight * maxUnit.toFloat())
-                                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                            )
-                        }
-                        repeat(maxUnit + 1) { index ->
-                            Box(
-                                modifier = Modifier
-                                    .offset(y = rowHeight * index.toFloat())
-                                    .width(columnWidth * 7f)
-                                    .height(1.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                            )
-                        }
-                        lessons.forEach { lesson ->
-                            val day = ChronoUnit.DAYS.between(weekStart, lesson.date).toInt()
-                            if (day !in 0..6) return@forEach
-                            val start = (lesson.startUnit - 1).coerceAtLeast(0)
-                            val span = (lesson.endUnit - lesson.startUnit + 1).coerceAtLeast(1)
-                            val isToday = lesson.date == today
-                            Box(
-                                modifier = Modifier
-                                    .offset(
-                                        x = columnWidth * day.toFloat() + 2.dp,
-                                        y = rowHeight * start.toFloat() + 1.dp,
-                                    )
-                                    .width(columnWidth - 4.dp)
-                                    .height(rowHeight * span.toFloat() - 2.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        if (isToday) {
-                                            MaterialTheme.colorScheme.primaryContainer
-                                        } else {
-                                            MaterialTheme.colorScheme.secondaryContainer
-                                        },
-                                    )
-                                    .clickable { onOpen(lesson) }
-                                    .padding(horizontal = 5.dp, vertical = 2.dp),
-                            ) {
-                                CourseBlock(lesson = lesson, span = span)
+                        Box(
+                            modifier = Modifier
+                                .width(columnWidth * 7f)
+                                .height(rowHeight * maxUnit.toFloat()),
+                        ) {
+                            repeat(8) { index ->
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = columnWidth * index.toFloat())
+                                        .width(1.dp)
+                                        .height(rowHeight * maxUnit.toFloat())
+                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                )
+                            }
+                            repeat(maxUnit + 1) { index ->
+                                Box(
+                                    modifier = Modifier
+                                        .offset(y = rowHeight * index.toFloat())
+                                        .width(columnWidth * 7f)
+                                        .height(1.dp)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                )
+                            }
+                            lessons.forEach { lesson ->
+                                val day = ChronoUnit.DAYS.between(weekStart, lesson.date).toInt()
+                                if (day !in 0..6) return@forEach
+                                val start = (lesson.startUnit - 1).coerceAtLeast(0)
+                                val span = (lesson.endUnit - lesson.startUnit + 1).coerceAtLeast(1)
+                                val isToday = lesson.date == today
+                                Box(
+                                    modifier = Modifier
+                                        .offset(
+                                            x = columnWidth * day.toFloat() + 1.5.dp,
+                                            y = rowHeight * start.toFloat() + 1.dp,
+                                        )
+                                        .width(columnWidth - 3.dp)
+                                        .height(rowHeight * span.toFloat() - 2.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(
+                                            if (isToday) {
+                                                MaterialTheme.colorScheme.primaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.secondaryContainer
+                                            },
+                                        )
+                                        .clickable { onOpen(lesson) }
+                                        .padding(horizontal = 4.dp, vertical = 1.dp),
+                                ) {
+                                    CourseBlock(lesson = lesson, span = span, dense = dense, ultraDense = ultraDense)
+                                }
                             }
                         }
                     }
                 }
             }
+        }
+
+        if (scrollVertically) {
+            Column(modifier = Modifier.fillMaxSize().verticalScroll(vScroll)) { table() }
+        } else {
+            Box(modifier = Modifier.fillMaxSize()) { table() }
         }
 
         if (lessons.isEmpty() && !loading) {
@@ -575,42 +609,46 @@ private fun TimetableGrid(
     }
 }
 
-/** 课程块：课程名一行、楼栋一行、房间一行。楼栋与房间分开，房间号带编号，看得清是哪个教室。 */
+/**
+ * 课程块。屏幕上能塞几行就画几行：
+ * 宽裕时「课程名 / 楼栋 / 房间号」三行（楼栋不带编号、房间号带编号）；
+ * 行高压到紧凑时只画课程名 + 教室，再挤就只画课程名，剩下的点开看。
+ */
 @Composable
-private fun CourseBlock(lesson: EamsLesson, span: Int) {
+private fun CourseBlock(lesson: EamsLesson, span: Int, dense: Boolean, ultraDense: Boolean) {
     val room = lesson.rooms.firstOrNull()
+    val place = room?.let { it.name.ifBlank { it.building } }.orEmpty()
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
             text = lesson.courseName,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = if (ultraDense) 9.sp else 11.sp),
             fontWeight = FontWeight.Medium,
             maxLines = if (span >= 2) 2 else 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (room != null) {
-            if (room.building.isNotBlank()) {
+        if (!ultraDense && room != null) {
+            if (!dense && room.building.isNotBlank()) {
                 Text(
                     text = room.building,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 12.sp),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 11.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (room.name.isNotBlank()) {
+            if (place.isNotEmpty()) {
                 Text(
-                    text = room.name,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 12.sp),
+                    text = place,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 11.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = if (span >= 2) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            // 多个教室（合班/换教室）时补一个「等 N 处」，详情里能看到全部
-            if (lesson.rooms.size > 1) {
+            if (!dense && span >= 2 && lesson.rooms.size > 1) {
                 Text(
                     text = "等 ${lesson.rooms.size} 处",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 12.sp),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 11.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                 )
