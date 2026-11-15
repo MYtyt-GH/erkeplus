@@ -197,6 +197,11 @@ fun WidgetScreen(preferences: AppPreferences, onBack: () -> Unit) {
                             )
                         }
                     }
+                    Text(
+                        text = "标准就是平时看到的字号；小是它的 90%，大是 135%。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 
@@ -328,7 +333,11 @@ private val TEXT_COLORS = listOf(
     ColorOption("#FF2F6FE0", "蓝"),
 )
 
-private val TEXT_SCALES = listOf(90 to "小", 100 to "标准", 115 to "大")
+private val TEXT_SCALES = listOf(
+    WidgetAppearance.TEXT_SCALE_SMALL to "小",
+    WidgetAppearance.TEXT_SCALE_NORMAL to "标准",
+    WidgetAppearance.TEXT_SCALE_LARGE to "大",
+)
 
 @Composable
 private fun ColorSwatches(

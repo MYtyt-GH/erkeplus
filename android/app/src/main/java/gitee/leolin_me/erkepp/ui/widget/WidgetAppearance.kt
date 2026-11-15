@@ -22,12 +22,23 @@ data class WidgetAppearance(
     val backgroundAlpha: Int,
     /** null 表示跟随主题。 */
     val textColor: Int?,
-    /** 90 / 100 / 115，百分比。 */
+    /** 文字大小的百分比，取值见 [TEXT_SCALE_SMALL] / [TEXT_SCALE_NORMAL] / [TEXT_SCALE_LARGE]。 */
     val textScale: Int,
 ) {
-    val effectiveTextScale: Float get() = textScale.coerceIn(80, 140) / 100f
+    val effectiveTextScale: Float get() = textScale.coerceIn(80, 150) / 100f
 
     companion object {
+        /**
+         * 三档文字大小，单位是「标准档的百分比」。
+         *
+         * 标准 = 100，就是布局里定的那套字号，**不随这次调整变化**；
+         * 大原来是 115，只比标准大 15%，在桌面上几乎看不出来（用户反馈「大没有标准大」），
+         * 2026-11-15 提到 135：字明显大一圈，同时桌面上还能排得下。
+         */
+        const val TEXT_SCALE_SMALL = 90
+        const val TEXT_SCALE_NORMAL = 100
+        const val TEXT_SCALE_LARGE = 135
+
         fun of(context: Context): WidgetAppearance = of(AppPreferences(context))
 
         fun of(preferences: AppPreferences): WidgetAppearance = WidgetAppearance(
