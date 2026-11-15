@@ -2,4 +2,33 @@
 <resources>
     <color name="window_background">#FF101114</color>
     <color name="ic_launcher_background">#FF1A5FB4</color>
+
+    <!-- 深色：与 ui/Theme.kt 的 DarkColors 对齐，见 values/colors.xml 的说明 -->
+    <color name="widget_surface">#FF101114</color>
+    <color name="widget_surface_glass">#E6101114</color>
+    <color name="widget_text">#FFE3E4E6</color>
+    <color name="widget_text_secondary">#FF9AA0A6</color>
+    <color name="widget_accent">#FF8AB4F8</color>
+    <color name="widget_accent_soft">#1F8AB4F8</color>
+    <color name="widget_row_now">#22FFFFFF</color>
+    <color name="widget_row_past">#14FFFFFF</color>
+    <color name="widget_column_today">#1A8AB4F8</color>
+
+    <color name="course_color_1">#FF8AB4F8</color>
+    <color name="course_color_2">#FF5FC7B9</color>
+    <color name="course_color_3">#FFE8A86A</color>
+    <color name="course_color_4">#FFB4A3F0</color>
+    <color name="course_color_5">#FFE79BC0</color>
+    <color name="course_color_6">#FF8FD08F</color>
+    <color name="course_color_7">#FFE0C878</color>
+    <color name="course_color_8">#FF9DB4C0</color>
+
+    <color name="course_tint_1">#338AB4F8</color>
+    <color name="course_tint_2">#335FC7B9</color>
+    <color name="course_tint_3">#33E8A86A</color>
+    <color name="course_tint_4">#33B4A3F0</color>
+    <color name="course_tint_5">#33E79BC0</color>
+    <color name="course_tint_6">#338FD08F</color>
+    <color name="course_tint_7">#33E0C878</color>
+    <color name="course_tint_8">#339DB4C0</color>
 </resources>

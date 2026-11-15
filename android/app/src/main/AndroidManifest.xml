@@ -47,6 +47,64 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!--
+            桌面小组件（三种画法，共用同一份课表缓存）：
+            - APPWIDGET_UPDATE：放置、改尺寸、开机后系统自己会发；
+            - DATE_CHANGED / TIME_SET / TIMEZONE_CHANGED / LOCALE_CHANGED：跨零点、改时间要重画；
+            - WIDGET_REFRESH：应用里数据或外观变了，主动推一次（见 WidgetRefresh）。
+            这些都不需要额外权限。
+        -->
+        <receiver
+            android:name=".ui.widget.board.BoardWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_board_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+                <action android:name="gitee.leolin_me.erkepp.action.WIDGET_REFRESH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_board_info" />
+        </receiver>
+
+        <receiver
+            android:name=".ui.widget.recent.RecentWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_recent_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+                <action android:name="gitee.leolin_me.erkepp.action.WIDGET_REFRESH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_recent_info" />
+        </receiver>
+
+        <receiver
+            android:name=".ui.widget.halfday.HalfDayWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_halfday_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+                <action android:name="gitee.leolin_me.erkepp.action.WIDGET_REFRESH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_halfday_info" />
+        </receiver>
     </application>
 
 </manifest>

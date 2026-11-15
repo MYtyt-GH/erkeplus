@@ -2,4 +2,40 @@
 <resources>
     <color name="window_background">#FFF7F8FA</color>
     <color name="ic_launcher_background">#FF1A5FB4</color>
+
+    <!--
+        桌面小组件的配色。Compose 的配色没法当资源给 RemoteViews 用，所以这里单独一份，
+        与 ui/Theme.kt 保持一致；改主题色时两处一起改。
+
+        课程配色（course_color_*）不只给小组件：课表页的课程块也用它，
+        保证同一门课在桌面和课表页是同一个颜色。
+    -->
+    <color name="widget_surface">#FFF7F8FA</color>
+    <color name="widget_surface_glass">#E6F7F8FA</color>
+    <color name="widget_text">#FF1B1C1E</color>
+    <color name="widget_text_secondary">#FF5F6368</color>
+    <color name="widget_accent">#FF1A5FB4</color>
+    <color name="widget_accent_soft">#141A5FB4</color>
+    <color name="widget_row_now">#12448EF0</color>
+    <color name="widget_row_past">#12000000</color>
+    <color name="widget_column_today">#0F1A5FB4</color>
+
+    <color name="course_color_1">#FF1A5FB4</color>
+    <color name="course_color_2">#FF0F7B6C</color>
+    <color name="course_color_3">#FFC2641C</color>
+    <color name="course_color_4">#FF6B4FC9</color>
+    <color name="course_color_5">#FFB03A6E</color>
+    <color name="course_color_6">#FF2E7D32</color>
+    <color name="course_color_7">#FFA6801A</color>
+    <color name="course_color_8">#FF4A6572</color>
+
+    <!-- 课程块的淡底：同一色相的 18%（深色 20%），压在课表页与小组件的行上 -->
+    <color name="course_tint_1">#2E1A5FB4</color>
+    <color name="course_tint_2">#2E0F7B6C</color>
+    <color name="course_tint_3">#2EC2641C</color>
+    <color name="course_tint_4">#2E6B4FC9</color>
+    <color name="course_tint_5">#2EB03A6E</color>
+    <color name="course_tint_6">#2E2E7D32</color>
+    <color name="course_tint_7">#2EA6801A</color>
+    <color name="course_tint_8">#2E4A6572</color>
 </resources>

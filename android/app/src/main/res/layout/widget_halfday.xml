@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    半天课表：标题写「上午 / 下午 / 晚上」，右边是阶段与天数（明天 / 周一），
+    下面是这个阶段的时间轴。示例行只用于预览，真正内容由 HalfDayWidgetProvider 替换。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- 背景：运行时按用户选的颜色/透明度画一张圆角位图 -->
+    <ImageView
+        android:id="@+id/widget_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_background_card" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/halfday_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="1"
+                android:textColor="@color/widget_text"
+                android:textSize="15sp"
+                android:text="上午" />
+
+            <TextView
+                android:id="@+id/halfday_day"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:maxLines="1"
+                android:textColor="@color/widget_accent"
+                android:textSize="11sp"
+                android:text="明天" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/halfday_rows"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="vertical">
+
+            <include layout="@layout/widget_course_row_medium" />
+
+            <include layout="@layout/widget_course_row_medium" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/halfday_hidden"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="10sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/halfday_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="13sp"
+            android:visibility="gone"
+            android:text="暂无半天课表" />
+    </LinearLayout>
+</FrameLayout>

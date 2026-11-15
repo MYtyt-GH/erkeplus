@@ -39,7 +39,9 @@ fun MoreScreen(
     onJoinOrganization: () -> Unit,
     onOpenRank: () -> Unit,
     onOpenStorage: () -> Unit,
+    onOpenWidgets: () -> Unit,
     onOpenWeb: () -> Unit,
+    onComingSoon: (String) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -54,7 +56,7 @@ fun MoreScreen(
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "公共入口，以及说不清算不算「我的」的杂项。",
+            text = "全校通用的入口，和与本机有关的设置。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -66,8 +68,29 @@ fun MoreScreen(
             Column {
                 EntryRow(
                     title = "学分排行榜",
-                    subtitle = "成绩即学分，由学时折算（1 学时 = 0.025 学分）；按学分排名，并列同名次",
+                    subtitle = "成绩就是学分，由学时折算（1 学时 = 0.025 学分）",
                     onClick = onOpenRank,
+                    showDivider = false,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(18.dp))
+        SectionLabel("教务")
+        Spacer(Modifier.height(8.dp))
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column {
+                // 课表本页在「我的」里；成绩与考试还没做，入口先放这里，
+                // 不塞进课表页底部——那两件事不属于一张周课表（2026-11-15 用户指出）
+                EntryRow(
+                    title = "成绩查询",
+                    subtitle = "看每门课的成绩、学分与绩点",
+                    onClick = { onComingSoon("成绩查询") },
+                )
+                EntryRow(
+                    title = "考试安排",
+                    subtitle = "看期末考试的时间、考场与座位号",
+                    onClick = { onComingSoon("考试安排") },
                     showDivider = false,
                 )
             }
@@ -87,6 +110,22 @@ fun MoreScreen(
                     title = "加入组织",
                     subtitle = "扫组织码，直接进那个组织的详情",
                     onClick = onJoinOrganization,
+                    showDivider = false,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(18.dp))
+        SectionLabel("桌面")
+        Spacer(Modifier.height(8.dp))
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column {
+                // 国产 ROM 把「添加小部件」入口藏得很深，用户经常找不到；
+                // 这里提供一个应用内的入口：先替用户调起系统固定，不行再给出手动路径
+                EntryRow(
+                    title = "桌面小组件",
+                    subtitle = "课表放桌面；背景色、透明度、文字颜色与字号都能自己调",
+                    onClick = onOpenWidgets,
                     showDivider = false,
                 )
             }
@@ -113,7 +152,7 @@ fun MoreScreen(
 
         Spacer(Modifier.height(20.dp))
         Text(
-            text = "这里只放入口和设置，不放「我」的内容；「我的组织」「我的附件」「我的课表」都在「我的」里。",
+            text = "还有功能没搬进来？「打开官方页面」可以在网页版里完成剩下的操作。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

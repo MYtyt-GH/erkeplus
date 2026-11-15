@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 课程圆点：时间轴上一节课一个点，颜色与课表页的课程块同一套（ui/CourseColor.kt） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/course_color_6" />
+    <size
+        android:width="8dp"
+        android:height="8dp" />
+</shape>

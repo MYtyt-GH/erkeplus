@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">二课++</string>
+
+    <!-- 桌面小组件：名称与说明会出现在系统的「添加小组件」列表里 -->
+    <string name="widget_board_label">课程看板</string>
+    <string name="widget_board_description">一天的课都列在桌面上，点一下打开课表</string>
+    <string name="widget_recent_label">最近两节课</string>
+    <string name="widget_recent_description">只看接下来最近的两节课，字大一点</string>
+    <string name="widget_halfday_label">半天课表</string>
+    <string name="widget_halfday_description">上午看上午、下午看下午，晚上没课就看第二天</string>
 </resources>

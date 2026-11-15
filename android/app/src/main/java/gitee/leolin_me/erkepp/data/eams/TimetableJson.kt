@@ -113,4 +113,34 @@ object TimetableJson {
     }
 
     private fun JsonObject.text(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
+
+    /** 学期也一起缓存：离线时没有它就换算不出周次，课表缓存也就白存了。 */
+    fun encodeSemester(semester: EamsSemester): String = json.encodeToString(
+        JsonObject.serializer(),
+        buildJsonObject {
+            put("id", JsonPrimitive(semester.id))
+            put("year", JsonPrimitive(semester.year))
+            put("name", JsonPrimitive(semester.name))
+            put("season", JsonPrimitive(semester.season))
+            put("startDate", JsonPrimitive(semester.startDate.toString()))
+            put("endDate", JsonPrimitive(semester.endDate.toString()))
+            put("weekStartDay", JsonPrimitive(semester.weekStartDay))
+        },
+    )
+
+    fun decodeSemester(text: String): EamsSemester? {
+        val root = runCatching { json.parseToJsonElement(text) }.getOrNull() as? JsonObject ?: return null
+        val id = root.text("id")?.takeIf { it.isNotBlank() } ?: return null
+        val start = root.text("startDate")?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
+        val end = root.text("endDate")?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
+        return EamsSemester(
+            id = id,
+            year = root.text("year").orEmpty(),
+            name = root.text("name").orEmpty(),
+            season = root.text("season").orEmpty(),
+            startDate = start,
+            endDate = end,
+            weekStartDay = root["weekStartDay"]?.jsonPrimitive?.intOrNull ?: 1,
+        )
+    }
 }
