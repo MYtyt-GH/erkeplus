@@ -7,5 +7,10 @@
             android:name=".debug.WidgetPreviewActivity"
             android:exported="true"
             android:label="小组件预览" />
+        <!-- 只在 debug 包里：用合成数据预览「阅办」的未读/已读/待办行（详见 NoticePreviewActivity） -->
+        <activity
+            android:name=".debug.NoticePreviewActivity"
+            android:exported="true"
+            android:label="阅办预览" />
     </application>
 </manifest>
