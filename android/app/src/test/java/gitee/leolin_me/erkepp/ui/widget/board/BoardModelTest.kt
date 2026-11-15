@@ -84,13 +84,20 @@ class BoardModelTest {
     }
 
     @Test
-    fun `放不下的课进「还有 N 节」`() {
+    fun `页脚报今天还剩几节`() {
         val lessons = (1..5).map { i ->
             WidgetFixtures.lesson("课$i", start = "%02d:00".format(7 + i), end = "%02d:40".format(7 + i), unit = i)
         }
         val model = build(WidgetFixtures.snapshot(lessons, nowMinute = 6 * 60), maxRows = 2)
         assertEquals(2, model.courses().size)
-        assertEquals("还有 3 节未显示", model.footer)
+        assertEquals("今天还有 5 节", model.footer)
+    }
+
+    @Test
+    fun `今天的课都上完且后面没课`() {
+        val model = build(WidgetFixtures.snapshot(WidgetFixtures.threeLessons, nowMinute = 21 * 60))
+        assertEquals("今天的课上完了", model.notice?.title)
+        assertNull(model.footer)
     }
 
     @Test

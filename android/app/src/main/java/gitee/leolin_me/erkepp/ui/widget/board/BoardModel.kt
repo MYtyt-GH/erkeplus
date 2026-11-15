@@ -1,5 +1,6 @@
 package gitee.leolin_me.erkepp.ui.widget.board
 
+import gitee.leolin_me.erkepp.data.eams.EamsLesson
 import gitee.leolin_me.erkepp.data.eams.SemesterCalendar
 import gitee.leolin_me.erkepp.data.eams.on
 import gitee.leolin_me.erkepp.ui.widget.WidgetDateTime
@@ -51,7 +52,6 @@ data class BoardModel(
             val capacity = maxRows.coerceAtLeast(1)
             val blocks = mutableListOf<BoardBlock>()
             var courses = 0
-            var skippedAfterFull = 0
             var firstDay: LocalDate? = null
 
             for (offset in 0 until LOOKAHEAD_DAYS) {
@@ -63,14 +63,10 @@ data class BoardModel(
                 firstDay = firstDay ?: day
                 // 只有这一天真的有课能摆出来，才插日期行；否则会出现「周三」后面一节课都没有
                 val visible = lessons.take((capacity - courses).coerceAtLeast(0))
-                if (visible.isEmpty()) {
-                    skippedAfterFull += lessons.size
-                    continue
-                }
+                if (visible.isEmpty()) continue
                 if (day != firstDay) {
                     blocks += BoardBlock.Day(dayLabelOf(day, today))
                 }
-                skippedAfterFull += lessons.size - visible.size
                 visible.forEach { lesson ->
                     blocks += BoardBlock.Course(widgetRow(lesson, today, snapshot.nowMinute, snapshot.aliases))
                     courses++
@@ -78,12 +74,18 @@ data class BoardModel(
             }
 
             if (blocks.isEmpty()) {
+                // 今天上过课、只是全上完了，和「今天本来就没课」要分开说
+                val hadToday = snapshot.lessons.on(today).isNotEmpty()
                 return BoardModel(
                     weekLabel = weekLabel,
                     dateLabel = dateLabelOf(today, today),
                     blocks = emptyList(),
                     footer = null,
-                    notice = WidgetNotice("今天没有课程", "这周剩下的时间没课"),
+                    notice = if (hadToday) {
+                        WidgetNotice("今天的课上完了", "这周剩下的时间没课")
+                    } else {
+                        WidgetNotice("今天没有课程", "这周剩下的时间没课")
+                    },
                 )
             }
 
@@ -91,9 +93,19 @@ data class BoardModel(
                 weekLabel = weekLabel,
                 dateLabel = dateLabelOf(firstDay ?: today, today),
                 blocks = blocks,
-                footer = if (skippedAfterFull > 0) "还有 $skippedAfterFull 节未显示" else null,
+                footer = footerOf(snapshot.lessons.on(today), snapshot.nowMinute),
                 notice = null,
             )
+        }
+
+        /**
+         * 页脚：今天还剩几节（全天的、含已显示的），今天没课/课上完了也如实说。
+         * 具体哪几节没摆上桌面，用户进课表页看得到，不必在这里报数。
+         */
+        private fun footerOf(todays: List<EamsLesson>, nowMinute: Int): String? {
+            if (todays.isEmpty()) return null
+            val left = todays.count { !WidgetDateTime.isPast(it, nowMinute) }
+            return if (left > 0) "今天还有 $left 节" else "今天的课上完了"
         }
 
         /** 今天写「11/13 周五」，别的日子写「明天 11/14」——桌面上一行长，日期要短。 */
