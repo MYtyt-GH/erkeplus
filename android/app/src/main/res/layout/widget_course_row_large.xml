@@ -49,6 +49,6 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="@color/widget_text_secondary"
-            android:textSize="13sp" />
+            android:textSize="14sp" />
     </LinearLayout>
 </LinearLayout>

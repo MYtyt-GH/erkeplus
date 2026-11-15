@@ -35,7 +35,7 @@ object WidgetText {
     val boardRow = listOf(
         WidgetTextSpec(R.id.row_time, 12f, primary = false),
         WidgetTextSpec(R.id.row_name, 17f, primary = true),
-        WidgetTextSpec(R.id.row_room, 12f, primary = false),
+        WidgetTextSpec(R.id.row_room, 14f, primary = false),
     )
 
     val halfDayWidget = listOf(
@@ -53,13 +53,13 @@ object WidgetText {
     /** 半天课表的一行：课名 + 「起止时间 · 教室」。 */
     val timelineRowMedium = listOf(
         WidgetTextSpec(R.id.row_name, 15f, primary = true),
-        WidgetTextSpec(R.id.row_meta, 11f, primary = false),
+        WidgetTextSpec(R.id.row_meta, 12f, primary = false),
     )
 
     /** 最近两节课的行（课名 + 「时间 · 教室」）。 */
     val recentRow = listOf(
         WidgetTextSpec(R.id.row_name, 18f, primary = true),
-        WidgetTextSpec(R.id.row_meta, 13f, primary = false),
+        WidgetTextSpec(R.id.row_meta, 14f, primary = false),
     )
 
     fun applySizes(views: RemoteViews, specs: List<WidgetTextSpec>, scale: Float) {

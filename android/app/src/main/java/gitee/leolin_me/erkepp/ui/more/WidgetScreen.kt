@@ -28,7 +28,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -167,24 +166,6 @@ fun WidgetScreen(preferences: AppPreferences, onBack: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
 
-                    Spacer(Modifier.height(10.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("毛玻璃", style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                text = "小组件读不到壁纸，做不了真模糊；这里用半透明近似（背景 80%）",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Switch(
-                            checked = preferences.widgetBackgroundAlpha in 1..95,
-                            onCheckedChange = { on ->
-                                preferences.widgetBackgroundAlpha = if (on) 80 else 100
-                                refreshWidgets()
-                            },
-                        )
-                    }
 
                     Spacer(Modifier.height(14.dp))
                     Text("文字颜色", style = MaterialTheme.typography.bodyMedium)

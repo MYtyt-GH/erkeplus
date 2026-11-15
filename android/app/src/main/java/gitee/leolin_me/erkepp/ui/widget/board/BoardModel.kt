@@ -91,7 +91,7 @@ data class BoardModel(
                 weekLabel = weekLabel,
                 dateLabel = dateLabelOf(firstDay ?: today, today),
                 blocks = blocks,
-                footer = if (skippedAfterFull > 0) "还有 $skippedAfterFull 节" else null,
+                footer = if (skippedAfterFull > 0) "还有 $skippedAfterFull 节未显示" else null,
                 notice = null,
             )
         }

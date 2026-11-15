@@ -90,7 +90,7 @@ class BoardModelTest {
         }
         val model = build(WidgetFixtures.snapshot(lessons, nowMinute = 6 * 60), maxRows = 2)
         assertEquals(2, model.courses().size)
-        assertEquals("还有 3 节", model.footer)
+        assertEquals("还有 3 节未显示", model.footer)
     }
 
     @Test
